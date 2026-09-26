@@ -78,6 +78,7 @@ import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_nav_home
 import nuvio.composeapp.generated.resources.compose_nav_library
 import nuvio.composeapp.generated.resources.compose_nav_search
+import nuvio.composeapp.generated.resources.live_tv_title
 import nuvio.composeapp.generated.resources.compose_settings_page_root
 import org.jetbrains.compose.resources.stringResource
 
@@ -153,6 +154,7 @@ private class PillTab(val tab: AppScreenTab, val label: String)
 @Composable
 internal fun PillNavigationBar(
     selectedTab: AppScreenTab,
+    liveTvEnabled: Boolean,
     onTabSelected: (AppScreenTab) -> Unit,
     onProfileSelected: (NuvioProfile) -> Unit,
     onSwitchProfile: () -> Unit,
@@ -171,12 +173,13 @@ internal fun PillNavigationBar(
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + PillNavTokens.barTopGap
     val hideDistancePx = with(density) { (topInset + PillNavTokens.barHeight).toPx() }
 
-    val tabs = listOf(
+    val tabs = listOfNotNull(
         PillTab(AppScreenTab.Home, stringResource(Res.string.compose_nav_home)),
         PillTab(AppScreenTab.Search, stringResource(Res.string.compose_nav_search)),
+        if (liveTvEnabled) PillTab(AppScreenTab.LiveTv, stringResource(Res.string.live_tv_title)) else null,
         PillTab(AppScreenTab.Library, stringResource(Res.string.compose_nav_library)),
     )
-    // Indices 0..2 are the text tabs, 3 is settings; the profile picture is never highlighted.
+    // Settings follows the visible text tabs; the profile picture is never highlighted.
     val settingsIndex = tabs.size
     val selectedIndex = when (selectedTab) {
         AppScreenTab.Settings -> settingsIndex
@@ -207,7 +210,7 @@ internal fun PillNavigationBar(
             },
         contentAlignment = Alignment.TopCenter,
     ) {
-        val itemPadding = if (maxWidth < 400.dp) 12.dp else 18.dp
+        val itemPadding = if (liveTvEnabled) 6.dp else if (maxWidth < 400.dp) 12.dp else 18.dp
         Box(
             modifier = Modifier
                 .widthIn(max = PillNavTokens.barMaxWidth)

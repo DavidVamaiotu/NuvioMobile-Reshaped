@@ -239,17 +239,20 @@ final class TabNavigationCoordinator: ObservableObject {
 enum NuvioAppTab: String, CaseIterable, Hashable {
     case home = "Home"
     case search = "Search"
+    case liveTv = "LiveTv"
     case library = "Library"
     case settings = "Settings"
 
     var fallbackTitle: String {
-        String(localized: String.LocalizationValue(rawValue))
+        if self == .liveTv { return "Live TV" }
+        return String(localized: String.LocalizationValue(rawValue))
     }
 
     static func from(kotlinName: String?) -> NuvioAppTab? {
         switch kotlinName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
         case "home": return .home
         case "search": return .search
+        case "livetv": return .liveTv
         case "library": return .library
         case "settings", "profile": return .settings
         default: return nil
@@ -260,6 +263,7 @@ enum NuvioAppTab: String, CaseIterable, Hashable {
         switch self {
         case .home: return "NuvioTabHome"
         case .search: return "NuvioTabSearch"
+        case .liveTv: return "NuvioTabLiveTv"
         case .library: return "NuvioTabLibrary"
         case .settings: return "NuvioTabProfile"
         }
@@ -269,6 +273,7 @@ enum NuvioAppTab: String, CaseIterable, Hashable {
         switch self {
         case .home: return "house.fill"
         case .search: return "magnifyingglass"
+        case .liveTv: return "tv.fill"
         case .library: return "rectangle.stack.fill"
         case .settings: return "person.crop.circle.fill"
         }
@@ -546,6 +551,7 @@ final class NativeProfileTabInteractionCoordinator: NSObject, UIGestureRecognize
 @MainActor
 final class AppNavigationCoordinator: ObservableObject {
     @Published var selectedTab: NuvioAppTab = .home
+    @Published private(set) var liveTvEnabled = UserDefaults.standard.bool(forKey: "NuvioLiveTvTabEnabled")
     @Published private(set) var isMainContentMounted = false
     @Published private(set) var isMainContentVisible = false
     @Published private(set) var isAppReady = false
@@ -556,6 +562,7 @@ final class AppNavigationCoordinator: ObservableObject {
 
     let homeCoordinator = TabNavigationCoordinator()
     let searchCoordinator = TabNavigationCoordinator()
+    let liveTvCoordinator = TabNavigationCoordinator()
     let libraryCoordinator = TabNavigationCoordinator()
     let settingsCoordinator = TabNavigationCoordinator()
     let appGateController = AppGateController()
@@ -570,13 +577,14 @@ final class AppNavigationCoordinator: ObservableObject {
     }
 
     private var allCoordinators: [TabNavigationCoordinator] {
-        [homeCoordinator, searchCoordinator, libraryCoordinator, settingsCoordinator]
+        [homeCoordinator, searchCoordinator, liveTvCoordinator, libraryCoordinator, settingsCoordinator]
     }
 
     func coordinator(for tab: NuvioAppTab) -> TabNavigationCoordinator {
         switch tab {
         case .home: return homeCoordinator
         case .search: return searchCoordinator
+        case .liveTv: return liveTvCoordinator
         case .library: return libraryCoordinator
         case .settings: return settingsCoordinator
         }
@@ -584,9 +592,18 @@ final class AppNavigationCoordinator: ObservableObject {
 
     func activateTab(named tabName: String) {
         guard let tab = NuvioAppTab.from(kotlinName: tabName) else { return }
+        if tab == .liveTv && !liveTvEnabled { return }
         if tab == .home || isAppReady {
             selectedTab = tab
         }
+    }
+
+    func refreshLiveTvTab() {
+        let enabled = UserDefaults.standard.bool(forKey: "NuvioLiveTvTabEnabled")
+        if !enabled && selectedTab == .liveTv { selectedTab = .home }
+        if liveTvEnabled != enabled { liveTvEnabled = enabled }
+        let title = UserDefaults.standard.string(forKey: "NuvioLiveTvTabTitle") ?? "Live TV"
+        if localizedTabTitles[.liveTv] != title { localizedTabTitles[.liveTv] = title }
     }
 
     func title(for tab: NuvioAppTab) -> String {
@@ -604,6 +621,7 @@ final class AppNavigationCoordinator: ObservableObject {
         localizedTabTitles = [
             .home: home,
             .search: search,
+            .liveTv: UserDefaults.standard.string(forKey: "NuvioLiveTvTabTitle") ?? "Live TV",
             .library: library,
             .settings: profile,
         ]
@@ -1208,6 +1226,10 @@ struct NativeNavContentView: View {
     @StateObject private var appCoordinator = AppNavigationCoordinator()
     @StateObject private var iconStore = NativeTabIconStore()
 
+    private var visibleTabs: [NuvioAppTab] {
+        NuvioAppTab.allCases.filter { $0 != .liveTv || appCoordinator.liveTvEnabled }
+    }
+
     private var usesNativeTabBar: Bool {
         guard UIDevice.current.userInterfaceIdiom == .phone else {
             return false
@@ -1230,6 +1252,7 @@ struct NativeNavContentView: View {
                     appCoordinator.profileTabInteraction.suppressesProfileSelection {
                     return
                 }
+                if newTab == .liveTv && !appCoordinator.liveTvEnabled { return }
                 if newTab == appCoordinator.selectedTab {
                     NativeTabBridgeKt.nativeTabSelect(tabName: newTab.rawValue)
                     return
@@ -1243,7 +1266,7 @@ struct NativeNavContentView: View {
 
     private var legacyTabs: some View {
         TabView(selection: tabSelection) {
-            ForEach(NuvioAppTab.allCases, id: \.self) { tab in
+            ForEach(visibleTabs, id: \.self) { tab in
                 TabContentView(
                     tab: tab,
                     usesNativeTabBar: usesNativeTabBar,
@@ -1276,7 +1299,7 @@ struct NativeNavContentView: View {
     @available(iOS 26.0, *)
     private var nativeTabs: some View {
         TabView(selection: tabSelection) {
-            ForEach(NuvioAppTab.allCases, id: \.self) { tab in
+            ForEach(visibleTabs, id: \.self) { tab in
                 if tab == .settings {
                     Tab(value: tab) {
                         TabContentView(
@@ -1368,6 +1391,9 @@ struct NativeNavContentView: View {
                 .allowsHitTesting(!appCoordinator.isAppReady)
                 .accessibilityHidden(appCoordinator.isAppReady)
                 .zIndex(1)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NuvioNativeTabChromeDidChange"))) { _ in
+            appCoordinator.refreshLiveTvTab()
         }
     }
 }

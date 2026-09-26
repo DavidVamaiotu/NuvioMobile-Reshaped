@@ -2415,5 +2415,6 @@
     <string name="live_tv_player_channels">Channels</string>
     <string name="live_tv_empty_title">Add your channel list</string>
     <string name="live_tv_empty_description">Enter an M3U URL to bring your live channels into Nuvio.</string>
-    <string name="settings_reshaped_live_tv_description">Manage IPTV playlists and providers</string>
+    <string name="settings_reshaped_live_tv_description">Show Live TV in the navigation bar</string>
+    <string name="settings_reshaped_live_tv_disabled">Enable Live TV in Nuvio Reshaped settings first.</string>
 </resources>

@@ -3,7 +3,14 @@ package com.nuvio.app.features.reshaped.livetv
 import platform.Foundation.NSUserDefaults
 
 actual object LiveTvStorage {
+    private const val tabEnabledKey = "ReshapedLiveTvTabEnabled"
     private const val sourceTypeKey = "live_tv_source_type"
+
+    actual fun loadTabEnabled(): Boolean = NSUserDefaults.standardUserDefaults.boolForKey(tabEnabledKey)
+
+    actual fun saveTabEnabled(enabled: Boolean) {
+        NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = tabEnabledKey)
+    }
     private const val sourceUrlKey = "live_tv_m3u_source_url"
     private const val localPlaylistDataKey = "live_tv_m3u_local_playlist_data"
     private const val stalkerPortalUrlKey = "live_tv_stalker_portal_url"

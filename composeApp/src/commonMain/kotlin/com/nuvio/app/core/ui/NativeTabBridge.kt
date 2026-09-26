@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 internal enum class NativeNavigationTab {
     Home,
     Search,
+    LiveTv,
     Library,
     Settings,
     ;
@@ -47,6 +48,10 @@ internal object NativeTabBridge {
 
     fun publishTabBarVisible(visible: Boolean) {
         publishNativeTabBarVisible(visible && isLiquidGlassNativeTabBarSupported())
+    }
+
+    fun publishLiveTvTab(enabled: Boolean, title: String) {
+        publishNativeLiveTvTab(enabled, title)
     }
 
     fun publishLiquidGlassEnabled(enabled: Boolean) {
@@ -201,6 +206,8 @@ internal expect fun isLiquidGlassNativeTabBarSupported(): Boolean
 internal expect fun publishLiquidGlassNativeTabBarEnabled(enabled: Boolean)
 
 internal expect fun publishNativeTabBarVisible(visible: Boolean)
+
+internal expect fun publishNativeLiveTvTab(enabled: Boolean, title: String)
 
 internal expect fun publishNativeSelectedTab(tabName: String)
 

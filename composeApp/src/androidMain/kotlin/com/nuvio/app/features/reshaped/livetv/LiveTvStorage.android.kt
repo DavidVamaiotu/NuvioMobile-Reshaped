@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 
 actual object LiveTvStorage {
     private const val preferencesName = "nuvio_live_tv"
+    private const val tabEnabledKey = "reshaped_live_tv_tab_enabled"
     private const val sourceTypeKey = "source_type"
     private const val sourceUrlKey = "m3u_source_url"
     private const val localPlaylistDataKey = "m3u_local_playlist_data"
@@ -48,6 +49,12 @@ actual object LiveTvStorage {
 
     fun initialize(context: Context) {
         preferences = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
+    }
+
+    actual fun loadTabEnabled(): Boolean = preferences?.getBoolean(tabEnabledKey, false) ?: false
+
+    actual fun saveTabEnabled(enabled: Boolean) {
+        preferences?.edit()?.putBoolean(tabEnabledKey, enabled)?.apply()
     }
 
     actual fun loadSourceType(): LiveTvSourceType =

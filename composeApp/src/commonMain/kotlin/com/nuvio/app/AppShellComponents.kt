@@ -32,6 +32,8 @@ import com.nuvio.app.features.library.LibraryItem
 import com.nuvio.app.features.library.LibraryScreen
 import com.nuvio.app.features.library.LibrarySection
 import com.nuvio.app.features.library.LibrarySortOption
+import com.nuvio.app.features.reshaped.livetv.LiveTvChannel
+import com.nuvio.app.features.reshaped.livetv.LiveTvScreen
 import com.nuvio.app.features.profiles.NuvioProfile
 import com.nuvio.app.features.profiles.ProfileBackgroundBackdrop
 import com.nuvio.app.features.search.SearchScreen
@@ -84,6 +86,7 @@ internal data class AppTabRequests(
 )
 
 internal data class AppTabActions(
+    val onLiveTvChannelClick: ((LiveTvChannel) -> Unit)? = null,
     val onCatalogClick: ((HomeCatalogSection) -> Unit)? = null,
     val onPosterClick: ((MetaPreview) -> Unit)? = null,
     val onPosterLongClick: ((MetaPreview) -> Unit)? = null,
@@ -154,6 +157,13 @@ internal fun AppTabHost(
                     onPosterLongClick = actions.onPosterLongClick,
                     searchFocusRequestCount = state.searchFocusRequestCount,
                     scrollToTopRequests = requests.searchScrollToTopRequests,
+                )
+            }
+
+            AppScreenTab.LiveTv -> {
+                LiveTvScreen(
+                    modifier = Modifier.fillMaxSize(),
+                    onChannelClick = { channel -> actions.onLiveTvChannelClick?.invoke(channel) },
                 )
             }
 

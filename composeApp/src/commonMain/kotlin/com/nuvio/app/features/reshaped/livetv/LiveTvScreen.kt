@@ -100,7 +100,7 @@ import org.jetbrains.compose.resources.stringResource
 fun LiveTvScreen(
     modifier: Modifier = Modifier,
     onChannelClick: (LiveTvChannel) -> Unit = {},
-    onBack: () -> Unit = {},
+    onBack: (() -> Unit)? = null,
 ) {
     val uiState by remember {
         LiveTvRepository.ensureLoaded()

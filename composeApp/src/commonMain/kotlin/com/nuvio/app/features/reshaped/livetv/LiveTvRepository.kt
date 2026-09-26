@@ -336,6 +336,8 @@ object LiveTvRepository {
 }
 
 internal expect object LiveTvStorage {
+    fun loadTabEnabled(): Boolean
+    fun saveTabEnabled(enabled: Boolean)
     fun loadSourceType(): LiveTvSourceType
     fun saveSourceType(type: LiveTvSourceType)
     fun loadSourceUrl(): String?

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -43,6 +44,7 @@ import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_nav_home
+import nuvio.composeapp.generated.resources.live_tv_title
 import nuvio.composeapp.generated.resources.compose_nav_library
 import nuvio.composeapp.generated.resources.compose_nav_profile
 import nuvio.composeapp.generated.resources.compose_nav_search
@@ -53,6 +55,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 internal fun MainTabsDestination(
     selectedTab: AppScreenTab,
+    liveTvEnabled: Boolean,
     initialHomeReady: Boolean,
     rootRouteActive: Boolean,
     useTabletFloatingTabBar: Boolean,
@@ -86,7 +89,7 @@ internal fun MainTabsDestination(
         val pillNavEnabled by PillNavRepository.enabled.collectAsStateWithLifecycle() // Pill nav hook
         val usePillNav = pillNavEnabled && !useNativeBottomTabs
         val pillNavState = rememberPillNavState()
-        val floatingNavigationItems = listOf(
+        val floatingNavigationItems = listOfNotNull(
             FloatingNavigationItem(
                 selected = selectedTab == AppScreenTab.Home,
                 onClick = { onTabSelected(AppScreenTab.Home) },
@@ -99,6 +102,12 @@ internal fun MainTabsDestination(
                 drawable = Res.drawable.sidebar_search,
                 label = stringResource(Res.string.compose_nav_search),
             ),
+            if (liveTvEnabled) FloatingNavigationItem(
+                selected = selectedTab == AppScreenTab.LiveTv,
+                onClick = { onTabSelected(AppScreenTab.LiveTv) },
+                icon = Icons.Filled.Tv,
+                label = stringResource(Res.string.live_tv_title),
+            ) else null,
             FloatingNavigationItem(
                 selected = selectedTab == AppScreenTab.Library,
                 onClick = { onTabSelected(AppScreenTab.Library) },
@@ -143,6 +152,14 @@ internal fun MainTabsDestination(
                             icon = Res.drawable.sidebar_search,
                             contentDescription = stringResource(Res.string.compose_nav_search),
                         )
+                        if (liveTvEnabled) {
+                            NavItem(
+                                selected = selectedTab == AppScreenTab.LiveTv,
+                                onClick = { onTabSelected(AppScreenTab.LiveTv) },
+                                icon = Icons.Filled.Tv,
+                                contentDescription = stringResource(Res.string.live_tv_title),
+                            )
+                        }
                         NavItem(
                             selected = selectedTab == AppScreenTab.Library,
                             onClick = { onTabSelected(AppScreenTab.Library) },
@@ -217,6 +234,7 @@ internal fun MainTabsDestination(
                 if (usePillNav) {
                     PillNavigationBar(
                         selectedTab = selectedTab,
+                        liveTvEnabled = liveTvEnabled,
                         onTabSelected = onTabSelected,
                         onProfileSelected = onProfileSelected,
                         onSwitchProfile = onAddProfileRequested,

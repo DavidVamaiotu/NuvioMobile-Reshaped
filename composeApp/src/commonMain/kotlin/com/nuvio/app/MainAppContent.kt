@@ -140,9 +140,8 @@ import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.reshaped.livetv.LiveTvChannel
 import com.nuvio.app.features.reshaped.livetv.LiveTvIncomingSource
 import com.nuvio.app.features.reshaped.livetv.LiveTvIncomingSourceRepository
-import com.nuvio.app.features.reshaped.livetv.LiveTvNavigationRequests
 import com.nuvio.app.features.reshaped.livetv.LiveTvRepository
-import com.nuvio.app.features.reshaped.livetv.LiveTvScreen
+import com.nuvio.app.features.reshaped.livetv.LiveTvTabSettings
 import com.nuvio.app.features.settings.AccountSettingsScreen
 import com.nuvio.app.features.settings.AddonsSettingsScreen
 import com.nuvio.app.features.settings.ContinueWatchingSettingsScreen
@@ -268,6 +267,10 @@ internal fun MainAppContent(
         val liquidGlassNativeTabBarEnabled by remember {
             ThemeSettingsRepository.liquidGlassNativeTabBarEnabled
         }.collectAsStateWithLifecycle()
+        val liveTvEnabled by remember {
+            LiveTvTabSettings.ensureLoaded()
+            LiveTvTabSettings.enabled
+        }.collectAsStateWithLifecycle()
         val liquidGlassNativeTabBarSupported = remember { isLiquidGlassNativeTabBarSupported() }
         var showExitConfirmation by rememberSaveable { mutableStateOf(false) }
         var selectedPosterActionTarget by remember { mutableStateOf<PosterActionTarget?>(null) }
@@ -343,8 +346,10 @@ internal fun MainAppContent(
     val cloudLibraryPlayFailedText = stringResource(Res.string.cloud_library_play_failed)
     val cloudLibraryPlayDisabledText = stringResource(Res.string.cloud_library_play_disabled)
     val cloudLibraryPlayNotConnectedText = stringResource(Res.string.cloud_library_play_not_connected)
+    val liveTvDisabledText = stringResource(Res.string.settings_reshaped_live_tv_disabled)
     val nativeTabHomeTitle = stringResource(Res.string.compose_nav_home)
     val nativeTabSearchTitle = stringResource(Res.string.compose_nav_search)
+    val nativeTabLiveTvTitle = stringResource(Res.string.live_tv_title)
     val nativeTabLibraryTitle = stringResource(Res.string.compose_nav_library)
     val nativeTabProfileTitle = stringResource(Res.string.compose_nav_profile)
     val nativeSwitchProfileTitle = stringResource(Res.string.compose_settings_root_switch_profile_title)
@@ -389,6 +394,7 @@ internal fun MainAppContent(
     }
 
     fun activateTab(tab: AppScreenTab) {
+        if (tab == AppScreenTab.LiveTv && !liveTvEnabled) return
         if (useNativeNavigation && onActivate != null) {
             onActivate(tab)
         } else {
@@ -397,6 +403,7 @@ internal fun MainAppContent(
     }
 
     fun handleRootTabClick(tab: AppScreenTab) {
+        if (tab == AppScreenTab.LiveTv && !liveTvEnabled) return
         if (selectedTab != tab) {
             activateTab(tab)
             return
@@ -408,6 +415,7 @@ internal fun MainAppContent(
                 searchFocusRequestCount++
                 searchScrollToTopRequests.tryEmit(Unit)
             }
+            AppScreenTab.LiveTv -> Unit
             AppScreenTab.Library -> libraryScrollToTopRequests.tryEmit(Unit)
             AppScreenTab.Settings -> settingsRootActionRequests.tryEmit(Unit)
         }
@@ -420,6 +428,7 @@ internal fun MainAppContent(
         onActivate,
         initialTab,
         currentRoute,
+        liveTvEnabled,
     ) {
         NativeTabBridge.requestedTabs.collectLatest { requestedTab ->
             val requestedAppTab = requestedTab.toAppScreenTab()
@@ -436,6 +445,13 @@ internal fun MainAppContent(
             ) {
                 handleRootTabClick(requestedAppTab)
             }
+        }
+    }
+
+    LaunchedEffect(liveTvEnabled, nativeTabLiveTvTitle) {
+        NativeTabBridge.publishLiveTvTab(liveTvEnabled, nativeTabLiveTvTitle)
+        if (!liveTvEnabled && selectedTab == AppScreenTab.LiveTv) {
+            activateTab(AppScreenTab.Home)
         }
     }
 
@@ -838,19 +854,30 @@ internal fun MainAppContent(
             }
         }
 
-        LaunchedEffect(Unit) {
-            LiveTvNavigationRequests.events.collect { navController.navigate(ReshapedLiveTvRoute) }
+        fun showLiveTvTab() {
+            if (!liveTvEnabled) {
+                NuvioToastController.show(liveTvDisabledText)
+                return
+            }
+            if (!useNativeNavigation && navController.currentRoute !is TabsRoute) {
+                navController.navigate(TabsRoute) {
+                    popUpTo<TabsRoute>()
+                    launchSingleTop = true
+                }
+            }
+            activateTab(AppScreenTab.LiveTv)
         }
-        LaunchedEffect(Unit) {
+
+        LaunchedEffect(liveTvEnabled, useNativeNavigation, onActivate) {
             LiveTvIncomingSourceRepository.requests.collect { source ->
                 when (source) {
                     is LiveTvIncomingSource.SourceUrl -> {
                         LiveTvRepository.load(source.url)
-                        navController.navigate(ReshapedLiveTvRoute)
+                        showLiveTvTab()
                     }
                     is LiveTvIncomingSource.PlaylistData -> {
                         LiveTvRepository.loadLocalPlaylist(source.fileName, source.data)
-                        navController.navigate(ReshapedLiveTvRoute)
+                        showLiveTvTab()
                     }
                     is LiveTvIncomingSource.DirectStream -> {
                         openReshapedLiveTvChannel(
@@ -1306,6 +1333,7 @@ internal fun MainAppContent(
                 entry<TabsRoute> {
                     MainTabsDestination(
                         selectedTab = selectedTab,
+                        liveTvEnabled = liveTvEnabled,
                         initialHomeReady = initialHomeReady,
                         rootRouteActive = currentRoute is TabsRoute,
                         useTabletFloatingTabBar = useTabletFloatingTabBar,
@@ -1350,6 +1378,9 @@ internal fun MainAppContent(
                         },
                         actions = { isTabletLayout ->
                             AppTabActions(
+                                onLiveTvChannelClick = { channel ->
+                                    coroutineScope.launch { openReshapedLiveTvChannel(channel) }
+                                },
                                 onCatalogClick = onCatalogClick,
                                 onPosterClick = { meta ->
                                     navController.navigate(
@@ -1594,16 +1625,6 @@ internal fun MainAppContent(
                         onTestUpdateBanner = if (
                             AppFeaturePolicy.inAppUpdaterEnabled && AppUpdaterPlatform.isDebugBuild
                         ) appUpdaterController::showDebugTestUpdate else null,
-                    )
-                }
-                entry<ReshapedLiveTvRoute> { route ->
-                    val onBack = rememberGuardedPopBackStack(navController, route)
-                    LiveTvScreen(
-                        modifier = Modifier.fillMaxSize(),
-                        onBack = onBack,
-                        onChannelClick = { channel ->
-                            coroutineScope.launch { openReshapedLiveTvChannel(channel) }
-                        },
                     )
                 }
                 entry<DownloadsRoute> { route ->

@@ -3,7 +3,6 @@ package com.nuvio.app.features.settings
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -13,7 +12,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.autosync.bubble.AutoSyncBubbleToasts
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.rememberSubtitleFontPicker
-import com.nuvio.app.features.reshaped.livetv.LiveTvNavigationRequests
+import com.nuvio.app.features.reshaped.livetv.LiveTvTabSettings
 import com.nuvio.app.features.streams.ConnectionSpeedEstimator
 import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
 import com.nuvio.app.isIos
@@ -60,17 +59,21 @@ internal fun LazyListScope.nuvioReshapedRootSection(isTablet: Boolean, onClick: 
 /** Everything Nuvio Reshaped adds on top of Nuvio, in one place. */
 internal fun LazyListScope.nuvioReshapedSettingsContent(isTablet: Boolean) {
     item {
+        val liveTvEnabled by remember {
+            LiveTvTabSettings.ensureLoaded()
+            LiveTvTabSettings.enabled
+        }.collectAsStateWithLifecycle()
         SettingsSection(
             title = stringResource(Res.string.live_tv_title),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
-                SettingsNavigationRow(
+                SettingsSwitchRow(
                     title = stringResource(Res.string.live_tv_title),
                     description = stringResource(Res.string.settings_reshaped_live_tv_description),
-                    icon = Icons.Rounded.Tv,
+                    checked = liveTvEnabled,
                     isTablet = isTablet,
-                    onClick = LiveTvNavigationRequests::open,
+                    onCheckedChange = LiveTvTabSettings::setEnabled,
                 )
             }
         }
