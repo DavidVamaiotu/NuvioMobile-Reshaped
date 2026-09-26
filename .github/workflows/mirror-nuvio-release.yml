@@ -1,6 +1,6 @@
 name: AutoSync Release
 
-# Release trigger: AudioSync statistics hidden by default
+# Release trigger: AudioSync statistics hidden by default, subtitle preference fix, Nuvio Reshaped release titles
 
 
 on:
@@ -157,7 +157,7 @@ jobs:
           set -euo pipefail
 
           {
-            echo "## AutoSync changelog"
+            echo "## Nuvio Reshaped changelog"
             echo
             # Hand-written highlights, shown only when the notes file changed since the last
             # release so old notes never repeat.
@@ -384,5 +384,5 @@ jobs:
             dist/*.apk \
             --repo "$GITHUB_REPOSITORY" \
             --target subtitle-autosync \
-            --title "$AUTOSYNC_TAG" \
+            --title "Nuvio Reshaped ${AUTOSYNC_TAG%-autosync.*} (build ${AUTOSYNC_TAG##*-autosync.})" \
             --notes-file autosync-release-notes.md
