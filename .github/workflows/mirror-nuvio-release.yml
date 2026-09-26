@@ -1,6 +1,6 @@
 name: AutoSync Release
 
-# Release trigger: stream order kept with connection matching, faster speed learning, seek buffer and bubble fixes
+# Release trigger: AudioSync statistics hidden by default
 
 
 on:
