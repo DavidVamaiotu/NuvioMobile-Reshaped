@@ -137,6 +137,12 @@ import com.nuvio.app.features.player.LockPlayerToLandscape
 import com.nuvio.app.features.player.HidePlayerSystemBars
 import com.nuvio.app.features.player.rememberExternalPlayerLauncher
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.features.reshaped.livetv.LiveTvChannel
+import com.nuvio.app.features.reshaped.livetv.LiveTvIncomingSource
+import com.nuvio.app.features.reshaped.livetv.LiveTvIncomingSourceRepository
+import com.nuvio.app.features.reshaped.livetv.LiveTvNavigationRequests
+import com.nuvio.app.features.reshaped.livetv.LiveTvRepository
+import com.nuvio.app.features.reshaped.livetv.LiveTvScreen
 import com.nuvio.app.features.settings.AccountSettingsScreen
 import com.nuvio.app.features.settings.AddonsSettingsScreen
 import com.nuvio.app.features.settings.ContinueWatchingSettingsScreen
@@ -801,6 +807,61 @@ internal fun MainAppContent(
                 ExternalPlayerIntentResult.Failed -> {
                     NuvioToastController.show(externalPlayerFailedText)
                     false
+                }
+            }
+        }
+
+        suspend fun openReshapedLiveTvChannel(channel: LiveTvChannel) {
+            val playbackChannel = LiveTvRepository.prepareForPlayback(channel)
+            LiveTvRepository.recordRecentChannel(channel)
+            val launch = PlayerLaunch(
+                profileId = activePlaybackProfileId,
+                title = playbackChannel.name,
+                sourceUrl = playbackChannel.streamUrl,
+                sourceHeaders = playbackChannel.headers,
+                streamType = playbackChannel.streamType,
+                logo = playbackChannel.logoUrl,
+                streamTitle = playbackChannel.name,
+                streamSubtitle = playbackChannel.group.takeIf(String::isNotBlank),
+                providerName = "Live TV",
+                providerAddonId = "reshaped-live-tv",
+                contentType = "live-tv",
+                videoId = playbackChannel.id,
+                parentMetaId = playbackChannel.id.ifBlank { playbackChannel.streamUrl },
+                parentMetaType = "live-tv",
+            )
+            if (playerSettingsUiState.externalPlayerEnabled) {
+                openExternalPlayback(launch)
+            } else {
+                val launchId = PlayerLaunchStore.put(launch)
+                navController.navigate(PlayerRoute(launchId = launchId, title = launch.title))
+            }
+        }
+
+        LaunchedEffect(Unit) {
+            LiveTvNavigationRequests.events.collect { navController.navigate(ReshapedLiveTvRoute) }
+        }
+        LaunchedEffect(Unit) {
+            LiveTvIncomingSourceRepository.requests.collect { source ->
+                when (source) {
+                    is LiveTvIncomingSource.SourceUrl -> {
+                        LiveTvRepository.load(source.url)
+                        navController.navigate(ReshapedLiveTvRoute)
+                    }
+                    is LiveTvIncomingSource.PlaylistData -> {
+                        LiveTvRepository.loadLocalPlaylist(source.fileName, source.data)
+                        navController.navigate(ReshapedLiveTvRoute)
+                    }
+                    is LiveTvIncomingSource.DirectStream -> {
+                        openReshapedLiveTvChannel(
+                            LiveTvChannel(
+                                id = source.url,
+                                name = source.title,
+                                streamUrl = source.url,
+                                headers = source.headers,
+                            ),
+                        )
+                    }
                 }
             }
         }
@@ -1533,6 +1594,16 @@ internal fun MainAppContent(
                         onTestUpdateBanner = if (
                             AppFeaturePolicy.inAppUpdaterEnabled && AppUpdaterPlatform.isDebugBuild
                         ) appUpdaterController::showDebugTestUpdate else null,
+                    )
+                }
+                entry<ReshapedLiveTvRoute> { route ->
+                    val onBack = rememberGuardedPopBackStack(navController, route)
+                    LiveTvScreen(
+                        modifier = Modifier.fillMaxSize(),
+                        onBack = onBack,
+                        onChannelClick = { channel ->
+                            coroutineScope.launch { openReshapedLiveTvChannel(channel) }
+                        },
                     )
                 }
                 entry<DownloadsRoute> { route ->

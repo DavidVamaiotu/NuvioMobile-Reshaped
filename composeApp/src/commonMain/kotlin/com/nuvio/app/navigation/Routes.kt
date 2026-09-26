@@ -33,6 +33,12 @@ sealed interface SettingsDestinationRoute : AppRoute {
 @Serializable
 data object TabsRoute : AppRoute
 
+/** Reshaped-owned Live TV destination; provider controls live in its screen. */
+@Serializable
+data object ReshapedLiveTvRoute : SettingsDestinationRoute {
+    override val title: String = "Live TV"
+}
+
 @Serializable
 data class DetailRoute(
     val type: String,

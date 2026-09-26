@@ -41,6 +41,9 @@ import com.nuvio.app.features.player.SubtitleFileCache
 import com.nuvio.app.features.player.PlayerPictureInPictureManager
 import com.nuvio.app.features.player.PipRemoteActionReceiver
 import com.nuvio.app.features.reshaped.ReshapedMigrationUi
+import com.nuvio.app.features.reshaped.livetv.LiveTvIncomingIntent
+import com.nuvio.app.features.reshaped.livetv.LiveTvPlaylistFileBridge
+import com.nuvio.app.features.reshaped.livetv.LiveTvStorage
 import com.nuvio.app.features.p2p.P2pSettingsStorage
 import com.nuvio.app.features.p2p.P2pStreamingEngine
 import com.nuvio.app.features.plugins.PluginStorage
@@ -145,6 +148,8 @@ open class MainActivity : AppCompatActivity() {
         BingeGroupCacheStorage.initialize(applicationContext)
         ConnectionSpeedStorage.initialize(applicationContext) // AutoSync hook
         PluginStorage.initialize(applicationContext)
+        LiveTvStorage.initialize(applicationContext) // Nuvio RS Live TV hook
+        LiveTvPlaylistFileBridge.bindActivity(this) // Nuvio RS Live TV hook
         CollectionMobileSettingsStorage.initialize(applicationContext)
         CollectionStorage.initialize(applicationContext)
         DownloadsStorage.initialize(applicationContext)
@@ -187,6 +192,7 @@ open class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         reshapedMigrationUi.onDestroy() // Nuvio RS hook
+        LiveTvPlaylistFileBridge.unbindActivity(this) // Nuvio RS Live TV hook
         EpisodeReleaseNotificationPlatform.unbindActivity(this)
         val receiver = pipRemoteActionReceiver
         if (receiver != null) {
@@ -194,6 +200,12 @@ open class MainActivity : AppCompatActivity() {
             pipRemoteActionReceiver = null
         }
         super.onDestroy()
+    }
+
+    @Deprecated("Used by the isolated Live TV document picker")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (LiveTvPlaylistFileBridge.handleActivityResult(requestCode, resultCode, data)) return
+        super.onActivityResult(requestCode, resultCode, data)
     }
 
     override fun onRequestPermissionsResult(
@@ -208,6 +220,7 @@ open class MainActivity : AppCompatActivity() {
     }
 
     private fun handleIncomingAppIntent(intent: Intent?) {
+        if (LiveTvIncomingIntent.accept(this, intent)) return
         val appUrl = intent?.dataString?.trim().orEmpty()
         if (appUrl.isBlank()) return
         handleAppUrl(appUrl)

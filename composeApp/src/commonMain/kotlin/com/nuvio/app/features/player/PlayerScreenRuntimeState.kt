@@ -53,6 +53,7 @@ internal class PlayerScreenRuntime(
     val parentMetaId: String get() = args.parentMetaId
     val parentMetaType: String get() = args.parentMetaType
     val providerAddonId: String? get() = args.providerAddonId
+    val isReshapedLiveTv: Boolean get() = contentType == "live-tv" && providerAddonId == "reshaped-live-tv"
     val torrentInfoHash: String? get() = args.torrentInfoHash
     val torrentFileIdx: Int? get() = args.torrentFileIdx
     val torrentFilename: String? get() = args.torrentFilename
@@ -61,6 +62,7 @@ internal class PlayerScreenRuntime(
     val initialProgressFraction: Float? get() = args.initialProgressFraction
     var externalSubtitles by mutableStateOf(args.externalSubtitles)
     val isSeries: Boolean get() = parentMetaType == "series"
+    var showReshapedLiveTvChannelsPanel by mutableStateOf(false)
 
     lateinit var scope: CoroutineScope
     lateinit var hapticFeedback: HapticFeedback

@@ -3,6 +3,7 @@ package com.nuvio.app.features.settings
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -12,6 +13,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.autosync.bubble.AutoSyncBubbleToasts
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.rememberSubtitleFontPicker
+import com.nuvio.app.features.reshaped.livetv.LiveTvNavigationRequests
 import com.nuvio.app.features.streams.ConnectionSpeedEstimator
 import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
 import com.nuvio.app.isIos
@@ -23,6 +25,8 @@ import nuvio.composeapp.generated.resources.settings_autosync_bubble_toast_descr
 import nuvio.composeapp.generated.resources.settings_nuvio_reshaped
 import nuvio.composeapp.generated.resources.settings_nuvio_reshaped_autosync_section
 import nuvio.composeapp.generated.resources.settings_nuvio_reshaped_description
+import nuvio.composeapp.generated.resources.live_tv_title
+import nuvio.composeapp.generated.resources.settings_reshaped_live_tv_description
 import nuvio.composeapp.generated.resources.settings_nuvio_reshaped_subtitle_section
 import nuvio.composeapp.generated.resources.settings_playback_subtitle_font
 import nuvio.composeapp.generated.resources.settings_playback_subtitle_font_default
@@ -55,6 +59,22 @@ internal fun LazyListScope.nuvioReshapedRootSection(isTablet: Boolean, onClick: 
 
 /** Everything Nuvio Reshaped adds on top of Nuvio, in one place. */
 internal fun LazyListScope.nuvioReshapedSettingsContent(isTablet: Boolean) {
+    item {
+        SettingsSection(
+            title = stringResource(Res.string.live_tv_title),
+            isTablet = isTablet,
+        ) {
+            SettingsGroup(isTablet = isTablet) {
+                SettingsNavigationRow(
+                    title = stringResource(Res.string.live_tv_title),
+                    description = stringResource(Res.string.settings_reshaped_live_tv_description),
+                    icon = Icons.Rounded.Tv,
+                    isTablet = isTablet,
+                    onClick = LiveTvNavigationRequests::open,
+                )
+            }
+        }
+    }
     if (!isIos) {
         item {
             val playerSettings by remember {

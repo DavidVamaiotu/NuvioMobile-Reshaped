@@ -16,6 +16,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import com.nuvio.app.features.autosync.bubble.AutoSyncBubbleToastHost
 import com.nuvio.app.features.p2p.P2pStreamingState
+import com.nuvio.app.features.reshaped.livetv.LiveTvChannelsPanel
+import com.nuvio.app.features.reshaped.livetv.LiveTvRepository
+import com.nuvio.app.features.reshaped.livetv.switchToReshapedLiveTvChannel
 import com.nuvio.app.features.p2p.formatP2pMegabytes
 import com.nuvio.app.features.p2p.formatP2pSpeed
 import com.nuvio.app.features.player.skip.internalSkipAction
@@ -240,6 +243,21 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
         )
         if (!isInPip) AutoSyncBubbleToastHost(controlsVisible) // AutoSync hook: bubble toast
         RenderPlayerModals(displayedPositionMs = displayedPositionMs)
+        if (isReshapedLiveTv) {
+            LiveTvChannelsPanel(
+                visible = showReshapedLiveTvChannelsPanel,
+                currentStreamUrl = activeSourceUrl,
+                onChannelSelected = { channel ->
+                    scope.launch {
+                        switchToReshapedLiveTvChannel(LiveTvRepository.prepareForPlayback(channel))
+                    }
+                },
+                onDismiss = {
+                    showReshapedLiveTvChannelsPanel = false
+                    controlsVisible = true
+                },
+            )
+        }
     }
 }
 
@@ -321,7 +339,8 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
             } else {
                 null
             },
-            onSourcesClick = if (activeVideoId != null) { { openSourcesPanel() } } else null,
+            onSourcesClick = if (!isReshapedLiveTv && activeVideoId != null) { { openSourcesPanel() } } else null,
+            onChannelsClick = if (isReshapedLiveTv) { { showReshapedLiveTvChannelsPanel = true } } else null,
             onEpisodesClick = if (isSeries) { { openEpisodesPanel() } } else null,
             onOpenInExternalPlayer = args.onOpenInExternalPlayer?.let { openExternal ->
                 {
