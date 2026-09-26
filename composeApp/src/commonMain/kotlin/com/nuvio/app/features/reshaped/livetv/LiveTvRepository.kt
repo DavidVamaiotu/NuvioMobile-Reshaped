@@ -395,17 +395,18 @@ object LiveTvRepository {
         val channelIds = tvgIds.mapTo(HashSet()) { it.lowercase() }
         epgJob = epgScope.launch {
             var schedule: LiveTvSchedule = emptyMap()
-            var fetchedAtMs = Long.MIN_VALUE
+            var nextFetchAtMs = 0L
             while (isActive) {
                 val nowMs = LiveTvClock.nowEpochMs()
-                if (nowMs - fetchedAtMs >= EPG_REFRESH_MS) {
+                if (nowMs >= nextFetchAtMs) {
                     val loaded = HashMap<String, List<LiveTvProgramme>>()
                     for (epgUrl in epgUrls) {
                         runCatching { loadXmlTvSchedule(epgUrl, channelIds, nowMs) }
                             .onSuccess { part -> part.forEach { (id, list) -> if (id !in loaded) loaded[id] = list } }
                     }
                     schedule = loaded
-                    fetchedAtMs = nowMs
+                    // A guide that could not be read is tried again sooner.
+                    nextFetchAtMs = nowMs + if (loaded.isEmpty()) EPG_RETRY_MS else EPG_REFRESH_MS
                 }
                 val current = currentProgrammes(schedule, tvgIds, nowMs)
                 if (mutableUiState.value.sourceUrl != sourceUrl) return@launch
@@ -427,6 +428,7 @@ object LiveTvRepository {
 private const val EPG_TICK_MS = 60_000L
 /** The guide keeps 12 hours; it is read again before that runs out. */
 private const val EPG_REFRESH_MS = 10L * 60 * 60 * 1000
+private const val EPG_RETRY_MS = 30L * 60 * 1000
 
 internal expect object LiveTvStorage {
     fun loadTabEnabled(): Boolean
