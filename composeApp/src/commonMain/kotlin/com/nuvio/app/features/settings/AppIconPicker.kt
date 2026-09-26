@@ -51,6 +51,7 @@ import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.NuvioStatusModal
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.core.ui.SurfaceEdge
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_cancel
@@ -157,6 +158,7 @@ private fun AppIconPickerDialog(
                 .widthIn(max = tokens.components.dialogMaxWidth),
             shape = tokens.shapes.dialog,
             color = tokens.colors.surfaceDialog,
+            border = BorderStroke(tokens.borders.thin, SurfaceEdge),
         ) {
             AppIconPickerContent(
                 state = state,
