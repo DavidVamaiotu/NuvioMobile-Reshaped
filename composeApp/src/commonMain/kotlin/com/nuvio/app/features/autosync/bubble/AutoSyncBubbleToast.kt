@@ -165,6 +165,7 @@ private fun AutoSyncBubble(message: AutoSyncBubbleMessage, modifier: Modifier) {
     fun dismiss() {
         if (leaving) return
         leaving = true
+        AutoSyncBubbleToasts.leaving(message.session)
         scope.launch {
             cardOpen = false
             labelVisible = false
