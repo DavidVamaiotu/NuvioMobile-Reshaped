@@ -1,4 +1,4 @@
-- **Simpler seek preview.** Scrubbing now shows just the frame you will land on, above the playhead, with no side frames, time labels or outline. It scales with the screen: a little bigger on phones, much bigger on tablets.
-- **Steadier playback with the seek buffer (Android, ExoPlayer).** Seeking back before the read-ahead no longer fails on debrid hosts that allow one connection per link. Live HLS/DASH playlists are left alone so they never play stale, and if the read-ahead file can't be written (storage full) the player simply reads directly.
-- **Seek previews made on the device no longer compete with playback for the hardware video decoder.**
-- **Latest Nuvio changes,** including the Urdu translation and the new loading animation.
+- **Stream order is kept when matching streams to your connection.** Your addon's order (including AIOStreams ranking) and your own sort stay as they are; only streams likely too heavy for your connection move to the end. Streams without size info stay where they were.
+- **Faster, more accurate speed learning.** Your speed is learned after about 10 seconds of real playback download instead of 30, skips the slow first second of each connection, and is never credited to the wrong network after a Wi-Fi/mobile switch. It follows your last few playbacks, so a slower or faster line is picked up within a couple of plays.
+- **Lighter on the device.** The network type is tracked by one system callback instead of being queried on every stream load, and the list pass only reorders when something actually needs to move.
+- **The speed status in Settings > Nuvio Reshaped now updates live.**

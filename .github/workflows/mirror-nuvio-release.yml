@@ -1,6 +1,6 @@
 name: AutoSync Release
 
-# Release trigger: single-frame seek preview, read-ahead and playlist fixes, upstream sync
+# Release trigger: stream order kept with connection matching, faster speed learning
 
 
 on:
