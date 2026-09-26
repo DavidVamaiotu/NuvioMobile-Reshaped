@@ -33,12 +33,14 @@ internal fun PlayerScreenRuntime.configureAutoSyncController(
         selectedSubtitleIndex = -1
         useCustomSubtitles = true
         preferredSubtitleSelectionApplied = true
-        // A secondary-language fallback is for this playback only: the next episode should still
-        // start from the first language, so the saved subtitle preference is left as it was.
+        // Only a subtitle the user chose (or restored from their choice) is saved. Saving an
+        // automatic pick would make the next episode restore an addon subtitle over Nuvio's
+        // built-in track selection. A secondary-language fallback is never saved either, so the
+        // next episode still starts from the first language.
         val switchedLanguage = previousSubtitle != null && appliedSubtitle != null &&
             previousSubtitle.language.isNotBlank() && appliedSubtitle.language.isNotBlank() &&
             !SubtitleLanguageMatching.matchesLanguageCode(appliedSubtitle.language, previousSubtitle.language)
-        if (appliedSubtitle != null && !switchedLanguage) {
+        if (appliedSubtitle != null && isUserExplicitSubtitleSelection && !switchedLanguage) {
             persistAddonSubtitlePreference(appliedSubtitle)
         }
 
