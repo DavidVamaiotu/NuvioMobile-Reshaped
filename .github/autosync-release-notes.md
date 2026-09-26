@@ -2,3 +2,5 @@
 - **Faster, more accurate speed learning.** Your speed is learned after about 10 seconds of real playback download instead of 30, skips the slow first second of each connection, and is never credited to the wrong network after a Wi-Fi/mobile switch. It follows your last few playbacks, so a slower or faster line is picked up within a couple of plays.
 - **Lighter on the device.** The network type is tracked by one system callback instead of being queried on every stream load, and the list pass only reorders when something actually needs to move.
 - **The speed status in Settings > Nuvio Reshaped now updates live.**
+- **Seeking with the seek buffer is reliable again.** Fixed a bug where the first seek could switch the read-ahead off for the rest of the video, and one where seeking just past the buffered mark could spin forever. Streams also get their full duration from the start.
+- **AutoSync notifications no longer get lost** when a new one arrives while the previous bubble is fading out.
