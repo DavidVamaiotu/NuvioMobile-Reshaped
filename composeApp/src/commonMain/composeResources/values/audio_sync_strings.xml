@@ -16,6 +16,8 @@
     <string name="settings_playback_speech_model_ready">Downloaded and ready. Tap to delete</string>
     <string name="settings_playback_speech_model_failed">Download failed (%1$s). Tap to retry</string>
     <string name="settings_playback_audio_sync_mobile_data">Sample across the film on mobile data</string>
+    <string name="settings_playback_audio_sync_show_statistics">Show AudioSync statistics</string>
+    <string name="settings_playback_audio_sync_show_statistics_description">Shows what audio sync is doing in the player's top-left corner while it runs</string>
     <string name="settings_playback_audio_sync_mobile_data_description">Syncs much faster by reading a few short parts of the film ahead of playback. Uses up to 150 MB per film</string>
     <string name="settings_playback_audio_sync_share_log">Share audio sync log</string>
     <string name="settings_playback_audio_sync_share_log_description">Timings and decisions of recent syncs, for reporting a problem. Links are shortened and no audio or subtitle text is included</string>

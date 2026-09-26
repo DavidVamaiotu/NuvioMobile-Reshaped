@@ -16,6 +16,8 @@ import nuvio.composeapp.generated.resources.settings_playback_audio_sync_fallbac
 import nuvio.composeapp.generated.resources.settings_playback_audio_sync_fallback_description
 import nuvio.composeapp.generated.resources.settings_playback_audio_sync_mobile_data
 import nuvio.composeapp.generated.resources.settings_playback_audio_sync_mobile_data_description
+import nuvio.composeapp.generated.resources.settings_playback_audio_sync_show_statistics
+import nuvio.composeapp.generated.resources.settings_playback_audio_sync_show_statistics_description
 import nuvio.composeapp.generated.resources.settings_playback_audio_sync_share_log
 import nuvio.composeapp.generated.resources.settings_playback_audio_sync_share_log_description
 import nuvio.composeapp.generated.resources.settings_playback_auto_sync_debug_logs
@@ -152,6 +154,7 @@ internal fun AutoSyncPlaybackSettingsRows(
 private fun AudioSyncFallbackSettingsRows(isTablet: Boolean, enabled: Boolean) {
     val fallbackEnabled by AudioSyncSettings.fallbackEnabled.collectAsStateWithLifecycle()
     val samplingOnMobileData by AudioSyncSettings.samplingOnMobileData.collectAsStateWithLifecycle()
+    val showStatistics by AudioSyncSettings.showStatistics.collectAsStateWithLifecycle()
     val speechModel by SubtitleSyncStatus.speechModel.collectAsStateWithLifecycle()
 
     SettingsGroupDivider(isTablet = isTablet)
@@ -196,6 +199,15 @@ private fun AudioSyncFallbackSettingsRows(isTablet: Boolean, enabled: Boolean) {
         enabled = active,
         isTablet = isTablet,
         onCheckedChange = AudioSyncSettings::setSamplingOnMobileData,
+    )
+    SettingsGroupDivider(isTablet = isTablet)
+    SettingsSwitchRow(
+        title = stringResource(Res.string.settings_playback_audio_sync_show_statistics),
+        description = stringResource(Res.string.settings_playback_audio_sync_show_statistics_description),
+        checked = showStatistics,
+        enabled = active,
+        isTablet = isTablet,
+        onCheckedChange = AudioSyncSettings::setShowStatistics,
     )
     SubtitleSyncStatus.logActions?.let { logActions ->
         SettingsGroupDivider(isTablet = isTablet)

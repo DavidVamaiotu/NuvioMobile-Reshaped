@@ -83,9 +83,14 @@ internal fun SubtitleSyncStatusOverlay(modifier: Modifier = Modifier) {
     }
 }
 
-/** The status panel in the player's top-left corner, clear of the safe area. */
+/**
+ * The status panel in the player's top-left corner, clear of the safe area. Shown only when
+ * "Show AudioSync statistics" is on; otherwise nothing is composed or collected.
+ */
 @Composable
 internal fun BoxScope.SubtitleSyncStatusPanel(horizontalSafePadding: Dp) {
+    val showStatistics by AudioSyncSettings.showStatistics.collectAsStateWithLifecycle()
+    if (!showStatistics) return
     SubtitleSyncStatusOverlay(
         modifier = Modifier
             .align(Alignment.TopStart)

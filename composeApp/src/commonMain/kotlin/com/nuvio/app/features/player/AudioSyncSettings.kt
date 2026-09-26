@@ -19,12 +19,18 @@ internal object AudioSyncSettings {
     /** Read short parts of the film ahead of playback on metered networks too. */
     val samplingOnMobileData: StateFlow<Boolean> = _samplingOnMobileData.asStateFlow()
 
+    private val _showStatistics = MutableStateFlow(false)
+
+    /** Show the live statistics panel in the player's top-left corner while audio sync runs. */
+    val showStatistics: StateFlow<Boolean> = _showStatistics.asStateFlow()
+
     private var save: (key: String, value: Boolean) -> Unit = { _, _ -> }
 
     fun installPersistence(load: (key: String) -> Boolean?, save: (key: String, value: Boolean) -> Unit) {
         this.save = save
         _fallbackEnabled.value = load(FALLBACK_ENABLED) ?: true
         _samplingOnMobileData.value = load(SAMPLING_ON_MOBILE_DATA) ?: false
+        _showStatistics.value = load(SHOW_STATISTICS) ?: false
     }
 
     fun setFallbackEnabled(enabled: Boolean) {
@@ -37,6 +43,12 @@ internal object AudioSyncSettings {
         save(SAMPLING_ON_MOBILE_DATA, enabled)
     }
 
+    fun setShowStatistics(enabled: Boolean) {
+        _showStatistics.value = enabled
+        save(SHOW_STATISTICS, enabled)
+    }
+
     private const val FALLBACK_ENABLED = "audio_sync_fallback_enabled"
     private const val SAMPLING_ON_MOBILE_DATA = "audio_sync_sampling_on_mobile_data"
+    private const val SHOW_STATISTICS = "audio_sync_show_statistics"
 }
