@@ -41,4 +41,19 @@
     <string name="live_tv_empty_description">Enter an M3U URL to bring your live channels into Nuvio.</string>
     <string name="settings_reshaped_live_tv_description">Show Live TV in the navigation bar</string>
     <string name="settings_reshaped_live_tv_disabled">Enable Live TV in Nuvio Reshaped settings first.</string>
+    <string name="live_tv_error_invalid_url">Enter a valid HTTP or HTTPS playlist link.</string>
+    <string name="live_tv_error_no_channels">No playable channels were found in this playlist.</string>
+    <string name="live_tv_error_load_failed">The playlist could not be loaded.</string>
+    <string name="live_tv_error_file_empty">The selected M3U file is empty.</string>
+    <string name="live_tv_error_file_no_channels">No playable channels were found in this M3U file.</string>
+    <string name="live_tv_error_file_failed">The M3U file could not be loaded.</string>
+    <string name="live_tv_error_stalker_required">Portal URL and MAC address are required.</string>
+    <string name="live_tv_error_stalker_invalid_url">Enter a valid HTTP or HTTPS portal link.</string>
+    <string name="live_tv_error_stalker_no_channels">No playable channels were found on this portal.</string>
+    <string name="live_tv_error_stalker_failed">The Stalker portal could not be loaded.</string>
+    <string name="live_tv_error_stalker_token">The portal did not start a session. Check the portal URL and MAC address.</string>
+    <string name="live_tv_error_xtream_required">Server URL, username, and password are required.</string>
+    <string name="live_tv_error_xtream_invalid_url">Enter a valid HTTP or HTTPS Xtream server URL.</string>
+    <string name="live_tv_error_xtream_no_channels">No playable channels were found for this Xtream provider.</string>
+    <string name="live_tv_error_xtream_failed">The Xtream provider could not be loaded.</string>
 </resources>

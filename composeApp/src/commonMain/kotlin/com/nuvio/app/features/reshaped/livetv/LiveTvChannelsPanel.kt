@@ -73,22 +73,22 @@ internal fun LiveTvChannelsPanel(
 ) {
     val tokens = MaterialTheme.nuvio
     val uiState by LiveTvRepository.uiState.collectAsStateWithLifecycle()
-    val channels = remember(uiState.channels, uiState.favoriteUrls) {
-        uiState.channels
-            .filterNot { com.nuvio.app.features.reshaped.livetv.isLikelyCategoryHeading(it.name) }
-            .sortedWith(
-                compareByDescending<LiveTvChannel> { it.streamUrl in uiState.favoriteUrls }
-                    .thenBy { it.name.lowercase() },
-            )
+    val listedChannels = remember(uiState.channels) {
+        uiState.channels.filterNot { isLikelyCategoryHeading(it.name) }
     }
-    val groups = remember(uiState.channels) {
-        uiState.channels
-            .filterNot { com.nuvio.app.features.reshaped.livetv.isLikelyCategoryHeading(it.name) }
-            .map { it.group }
+    val channels = remember(listedChannels, uiState.favoriteUrls) {
+        listedChannels.sortedWith(
+            compareByDescending<LiveTvChannel> { it.streamUrl in uiState.favoriteUrls }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name },
+        )
+    }
+    val groups = remember(listedChannels) {
+        listedChannels.mapTo(LinkedHashSet()) { it.group }
             .filter { it.isNotBlank() }
-            .distinct()
             .sorted()
     }
+    // A Stalker channel plays from a link made for this play: find its list entry.
+    val playingListUrl = remember(currentStreamUrl) { LiveTvPlaybackRegistry.listUrlFor(currentStreamUrl) }
     var selectedGroup by rememberSaveable { mutableStateOf("") }
     var favoritesOnly by rememberSaveable { mutableStateOf(false) }
     val filteredChannels = remember(channels, selectedGroup, favoritesOnly) {
@@ -211,7 +211,7 @@ internal fun LiveTvChannelsPanel(
                             items(filteredChannels, key = LiveTvChannel::id) { channel ->
                                 LiveTvPlayerChannelRow(
                                     channel = channel,
-                                    selected = channel.streamUrl == currentStreamUrl,
+                                    selected = channel.streamUrl == playingListUrl,
                                     favorite = channel.streamUrl in uiState.favoriteUrls,
                                     onFavoriteClick = { LiveTvRepository.toggleFavorite(channel) },
                                     onClick = { onChannelSelected(channel) },

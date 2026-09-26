@@ -138,10 +138,9 @@ import com.nuvio.app.features.player.HidePlayerSystemBars
 import com.nuvio.app.features.player.rememberExternalPlayerLauncher
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.reshaped.livetv.LiveTvChannel
-import com.nuvio.app.features.reshaped.livetv.LiveTvIncomingSource
-import com.nuvio.app.features.reshaped.livetv.LiveTvIncomingSourceRepository
-import com.nuvio.app.features.reshaped.livetv.LiveTvRepository
 import com.nuvio.app.features.reshaped.livetv.LiveTvTabSettings
+import com.nuvio.app.features.reshaped.livetv.collectLiveTvIncomingSources
+import com.nuvio.app.features.reshaped.livetv.reshapedLiveTvPlayerLaunch
 import com.nuvio.app.features.settings.AccountSettingsScreen
 import com.nuvio.app.features.settings.AddonsSettingsScreen
 import com.nuvio.app.features.settings.ContinueWatchingSettingsScreen
@@ -827,25 +826,8 @@ internal fun MainAppContent(
             }
         }
 
-        suspend fun openReshapedLiveTvChannel(channel: LiveTvChannel) {
-            val playbackChannel = LiveTvRepository.prepareForPlayback(channel)
-            LiveTvRepository.recordRecentChannel(channel)
-            val launch = PlayerLaunch(
-                profileId = activePlaybackProfileId,
-                title = playbackChannel.name,
-                sourceUrl = playbackChannel.streamUrl,
-                sourceHeaders = playbackChannel.headers,
-                streamType = playbackChannel.streamType,
-                logo = playbackChannel.logoUrl,
-                streamTitle = playbackChannel.name,
-                streamSubtitle = playbackChannel.group.takeIf(String::isNotBlank),
-                providerName = "Live TV",
-                providerAddonId = "reshaped-live-tv",
-                contentType = "live-tv",
-                videoId = playbackChannel.id,
-                parentMetaId = playbackChannel.id.ifBlank { playbackChannel.streamUrl },
-                parentMetaType = "live-tv",
-            )
+        suspend fun openReshapedLiveTvChannel(channel: LiveTvChannel) { // Nuvio RS Live TV hook
+            val launch = reshapedLiveTvPlayerLaunch(channel, activePlaybackProfileId)
             if (playerSettingsUiState.externalPlayerEnabled) {
                 openExternalPlayback(launch)
             } else {
@@ -868,29 +850,8 @@ internal fun MainAppContent(
             activateTab(AppScreenTab.LiveTv)
         }
 
-        LaunchedEffect(liveTvEnabled, useNativeNavigation, onActivate) {
-            LiveTvIncomingSourceRepository.requests.collect { source ->
-                when (source) {
-                    is LiveTvIncomingSource.SourceUrl -> {
-                        LiveTvRepository.load(source.url)
-                        showLiveTvTab()
-                    }
-                    is LiveTvIncomingSource.PlaylistData -> {
-                        LiveTvRepository.loadLocalPlaylist(source.fileName, source.data)
-                        showLiveTvTab()
-                    }
-                    is LiveTvIncomingSource.DirectStream -> {
-                        openReshapedLiveTvChannel(
-                            LiveTvChannel(
-                                id = source.url,
-                                name = source.title,
-                                streamUrl = source.url,
-                                headers = source.headers,
-                            ),
-                        )
-                    }
-                }
-            }
+        LaunchedEffect(liveTvEnabled, useNativeNavigation, onActivate) { // Nuvio RS Live TV hook
+            collectLiveTvIncomingSources(onShowTab = { showLiveTvTab() }, onPlay = { openReshapedLiveTvChannel(it) })
         }
 
         fun openDownloadedItem(item: DownloadItem) {

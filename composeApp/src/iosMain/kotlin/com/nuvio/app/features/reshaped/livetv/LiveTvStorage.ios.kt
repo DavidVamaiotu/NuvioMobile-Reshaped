@@ -1,7 +1,16 @@
 package com.nuvio.app.features.reshaped.livetv
 
+import kotlinx.cinterop.ExperimentalForeignApi
+import platform.Foundation.NSFileManager
+import platform.Foundation.NSHomeDirectory
+import platform.Foundation.NSString
+import platform.Foundation.NSUTF8StringEncoding
 import platform.Foundation.NSUserDefaults
+import platform.Foundation.create
+import platform.Foundation.stringWithContentsOfFile
+import platform.Foundation.writeToFile
 
+@OptIn(ExperimentalForeignApi::class)
 actual object LiveTvStorage {
     private const val tabEnabledKey = "ReshapedLiveTvTabEnabled"
     private const val sourceTypeKey = "live_tv_source_type"
@@ -69,11 +78,34 @@ actual object LiveTvStorage {
         saveScopedString(sourceUrlKey, url)
     }
 
-    actual fun loadLocalPlaylistData(): String? =
-        loadScopedString(localPlaylistDataKey)
+    /** Imported playlists can be megabytes, so they live in files, not in the user defaults. */
+    private val playlistDirectory = "${NSHomeDirectory()}/Library/Application Support/NuvioLiveTv"
+
+    private fun playlistPath(): String = "$playlistDirectory/playlist_${resolvedProfileId()}.m3u"
+
+    actual fun hasLocalPlaylistData(): Boolean =
+        NSFileManager.defaultManager.fileExistsAtPath(playlistPath()) ||
+            loadScopedString(localPlaylistDataKey)?.isNotBlank() == true
+
+    actual fun loadLocalPlaylistData(): String? {
+        NSString.stringWithContentsOfFile(playlistPath(), NSUTF8StringEncoding, null)
+            ?.takeIf(String::isNotBlank)
+            ?.let { return it }
+        // Earlier builds kept it in the user defaults: move it to a file once.
+        val legacy = loadScopedString(localPlaylistDataKey)?.takeIf(String::isNotBlank) ?: return null
+        saveLocalPlaylistData(legacy)
+        return legacy
+    }
 
     actual fun saveLocalPlaylistData(data: String) {
-        saveScopedString(localPlaylistDataKey, data)
+        val path = playlistPath()
+        if (data.isBlank()) {
+            NSFileManager.defaultManager.removeItemAtPath(path, null)
+        } else {
+            NSFileManager.defaultManager.createDirectoryAtPath(playlistDirectory, true, null, null)
+            if (!NSString.create(string = data).writeToFile(path, true, NSUTF8StringEncoding, null)) return
+        }
+        saveScopedString(localPlaylistDataKey, null)
     }
 
     actual fun loadStalkerSettings(): LiveTvStalkerSettings {

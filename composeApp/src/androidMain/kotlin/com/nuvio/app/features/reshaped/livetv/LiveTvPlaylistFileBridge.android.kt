@@ -1,7 +1,10 @@
 package com.nuvio.app.features.reshaped.livetv
 
 import android.app.Activity
+import android.content.ContentResolver
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import androidx.appcompat.app.AppCompatActivity
 import java.lang.ref.WeakReference
 
@@ -92,7 +95,13 @@ internal actual object LiveTvPlaylistFileBridge {
                 val callback = pendingImportCallback
                 clearPendingImport()
                 if (callback != null) {
-                    callback(handleImportResult(resultCode, data))
+                    // A playlist can be megabytes: read it off the main thread, answer on it.
+                    val resolver = activityRef?.get()?.applicationContext?.contentResolver
+                    val mainHandler = Handler(Looper.getMainLooper())
+                    Thread({
+                        val result = handleImportResult(resultCode, data, resolver)
+                        mainHandler.post { callback(result) }
+                    }, "NuvioLiveTvImport").apply { isDaemon = true }.start()
                 }
                 true
             }
@@ -118,10 +127,11 @@ internal actual object LiveTvPlaylistFileBridge {
     private fun handleImportResult(
         resultCode: Int,
         data: Intent?,
+        contentResolver: ContentResolver?,
     ): Result<String> = runCatching {
         if (resultCode != Activity.RESULT_OK) error("Backup import cancelled.")
         val uri = data?.data ?: error("No backup file selected.")
-        val resolver = activityRef?.get()?.contentResolver ?: error("Backup import is not available right now.")
+        val resolver = contentResolver ?: error("Backup import is not available right now.")
         resolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
             reader.readText()
         } ?: error("Could not open backup file.")

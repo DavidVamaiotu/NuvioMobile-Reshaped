@@ -90,17 +90,21 @@ object LiveTvIncomingSourceRepository {
     private val requestChannel = Channel<LiveTvIncomingSource>(capacity = Channel.BUFFERED)
     val requests: Flow<LiveTvIncomingSource> = requestChannel.receiveAsFlow()
 
-    fun submitText(text: String) {
+    /**
+     * Takes shared text that is a playlist, a playlist link or a direct stream link. Anything
+     * else (a web page, a video site link) is left alone; false tells the caller so.
+     */
+    fun submitText(text: String): Boolean {
         val trimmed = text.trim()
-        if (trimmed.isBlank()) return
+        if (trimmed.isBlank()) return false
         if (trimmed.startsWith("#EXTM3U", ignoreCase = true)) {
             requestChannel.trySend(LiveTvIncomingSource.PlaylistData(fileName = "Shared M3U playlist", data = trimmed))
-            return
+            return true
         }
-        val url = firstSharedUrl(trimmed) ?: return
+        val url = firstSharedUrl(trimmed) ?: return false
         when {
             url.looksLikePlaylistUrl() -> requestChannel.trySend(LiveTvIncomingSource.SourceUrl(url))
-            url.startsWith("http://", ignoreCase = true) || url.startsWith("https://", ignoreCase = true) -> {
+            url.looksLikeDirectVideoUrl() -> {
                 requestChannel.trySend(
                     LiveTvIncomingSource.DirectStream(
                         url = url,
@@ -108,7 +112,9 @@ object LiveTvIncomingSourceRepository {
                     ),
                 )
             }
+            else -> return false
         }
+        return true
     }
 
     fun submitPlaylistData(fileName: String, data: String) {
@@ -129,6 +135,9 @@ private fun firstSharedUrl(value: String): String? =
     sharedUrlRegex.find(value)?.value?.trim()?.trimEnd(',', '.', ')', ']')
 
 private fun String.looksLikePlaylistUrl(): Boolean {
-    val normalized = substringBefore('#').substringBefore('?').lowercase()
-    return normalized.endsWith(".m3u") || normalized.endsWith(".m3u8")
+    val lower = lowercase()
+    val path = lower.substringBefore('#').substringBefore('?')
+    // Xtream providers hand out playlists as get.php?username=…&type=m3u_plus.
+    return path.endsWith(".m3u") || path.endsWith(".m3u8") ||
+        (path.endsWith("/get.php") && "type=m3u" in lower)
 }
