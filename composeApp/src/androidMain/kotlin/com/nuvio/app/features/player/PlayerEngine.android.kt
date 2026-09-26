@@ -550,6 +550,8 @@ private fun ExoPlayerSurface(
             }
         }
 
+        var liveEdgeRejoins = 0 // Nuvio RS: live window recovery
+
         fun reportPlayerError(error: PlaybackException) {
             if (
                 playerSettings.decoderPriority == DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON &&
@@ -584,6 +586,14 @@ private fun ExoPlayerSurface(
                         "causeChain=${diagnosticThrowableChain(error)}",
                     error,
                 )
+
+                // Nuvio RS: a paused or stalled live stream fell out of its playlist window; rejoin the live edge.
+                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW && liveEdgeRejoins < 3) {
+                    liveEdgeRejoins++
+                    exoPlayer.seekToDefaultPosition()
+                    exoPlayer.prepare()
+                    return
+                }
 
                 val isSourceError = error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW ||
                         error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
@@ -631,6 +641,7 @@ private fun ExoPlayerSurface(
                         "terminalError=${exoPlayer.playerError?.errorCodeName ?: "none"}",
                 )
                 if (playbackState == Player.STATE_READY) {
+                    liveEdgeRejoins = 0 // Nuvio RS: live window recovery
                     fallbackStartPositionMs = null
                     latestOnError.value(null)
                     exoPlayer.logCurrentTracks("STATE_READY")
@@ -969,7 +980,9 @@ private fun ExoPlayerSurface(
         while (isActive) {
             throughputSampler.onBytesTick(
                 bytes = networkBytesCounter.getAndSet(0L),
-                isFetching = PlaybackSeekCache.isDownloading(sourceUrl) ?: exoPlayer.isLoading, // Nuvio RS: read-ahead
+                // Nuvio RS: read-ahead; a live stream only arrives at its own bitrate, so it says nothing about the network.
+                isFetching = !exoPlayer.isCurrentMediaItemLive && exoPlayer.duration != C.TIME_UNSET &&
+                    (PlaybackSeekCache.isDownloading(sourceUrl) ?: exoPlayer.isLoading),
             )
             delay(THROUGHPUT_TICK_MS)
         }
@@ -1457,7 +1470,9 @@ private class NuvioLibmpvView(
                 runCatching {
                     MpvNetworkActivity(
                         bytesPerSecond = mpv.getPropertyDouble("cache-speed")?.toLong() ?: 0L,
-                        isFetching = mpv.getPropertyBoolean("demuxer-cache-idle") == false,
+                        // A live stream has no duration and only arrives at its own bitrate.
+                        isFetching = mpv.getPropertyBoolean("demuxer-cache-idle") == false &&
+                            (mpv.getPropertyDouble("duration") ?: 0.0) > 0.0,
                     )
                 }.getOrNull()
             }

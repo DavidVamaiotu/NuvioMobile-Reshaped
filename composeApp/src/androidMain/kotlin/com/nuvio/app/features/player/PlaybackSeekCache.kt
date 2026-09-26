@@ -12,6 +12,7 @@ import androidx.media3.common.C
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.TransferListener
+import com.nuvio.app.features.reshaped.livetv.LiveTvPlaybackRegistry
 import java.io.File
 import java.io.IOException
 import java.io.InterruptedIOException
@@ -58,7 +59,7 @@ internal object PlaybackSeekCache {
     @Synchronized
     fun wrap(context: Context, sourceUrl: String, cacheable: Boolean, upstream: DataSource.Factory): DataSource.Factory {
         val chosen = PlaybackBufferSettings.bufferMb.value.coerceAtLeast(0) * MB
-        if (!cacheable || chosen <= 0 || looksAdaptive(sourceUrl)) return upstream
+        if (!cacheable || chosen <= 0 || looksAdaptive(sourceUrl) || LiveTvPlaybackRegistry.isLiveTv(sourceUrl)) return upstream
         val active = session?.takeIf { it.key == sourceUrl && !it.isClosed } ?: run {
             session?.close()
             session = null
@@ -106,7 +107,7 @@ internal object PlaybackSeekCache {
      * Null when no read-ahead serves [sourceUrl], so ExoPlayer's own loading state applies.
      */
     fun isDownloading(sourceUrl: String): Boolean? =
-        session?.takeIf { it.key == sourceUrl && !it.isClosed }?.isDownloading
+        session?.takeIf { it.key == sourceUrl && !it.isClosed && !it.readsDirectly }?.isDownloading
 
     /** Called when the player for [sourceUrl] is released: stops reading and deletes the file. */
     @Synchronized
@@ -159,6 +160,12 @@ private class ReadAheadSession(val key: String, private val file: File, private 
     private var fileReaders = 0
     /** Set when the server says the stream is an HLS/DASH playlist: later reads go direct. */
     private var adaptive = false
+    /**
+     * Set when the stream has no length and no byte ranges (a live TV feed): it cannot be
+     * reopened part way, and there is nothing ahead of the live edge to keep, so the player
+     * reads it directly and the read-ahead stops.
+     */
+    private var unbounded = false
 
     /** True while the connection is receiving data, false while it waits (full, ended, retry). */
     @Volatile var isDownloading = false
@@ -170,6 +177,9 @@ private class ReadAheadSession(val key: String, private val file: File, private 
 
     val isClosed: Boolean get() = lock.withLock { closed }
 
+    /** The player should read this stream directly (see [unbounded]). */
+    val readsDirectly: Boolean get() = lock.withLock { unbounded }
+
     /**
      * Prepares the ring for a player read at [position]: inside (or just past) it, the read waits
      * for the connection; anywhere else the read-ahead moves there. A connection error the
@@ -177,7 +187,7 @@ private class ReadAheadSession(val key: String, private val file: File, private 
      */
     fun serve(position: Long): Boolean {
         lock.withLock {
-            if (closed || adaptive) return false
+            if (closed || adaptive || unbounded) return false
             if (started && position >= windowStart && position <= windowEnd + NEAR_BYTES) {
                 makeRoomFor(position)
                 if (error != null) {
@@ -264,7 +274,7 @@ private class ReadAheadSession(val key: String, private val file: File, private 
         if (Thread.currentThread().isInterrupted) throw InterruptedIOException()
         val available = lock.withLock {
             makeRoomFor(position)
-            while (!closed && position >= windowStart && position >= windowEnd && !ended && error == null) {
+            while (!closed && !unbounded && position >= windowStart && position >= windowEnd && !ended && error == null) {
                 try {
                     changed.await()
                 } catch (interrupted: InterruptedException) {
@@ -273,6 +283,8 @@ private class ReadAheadSession(val key: String, private val file: File, private 
                 }
             }
             if (closed) throw IOException("read-ahead closed")
+            // The player reopens, and the open then goes to the stream directly.
+            if (unbounded) throw IOException("live stream: read directly")
             if (position < windowStart) throw IOException("read-ahead moved")
             if (position >= windowEnd) {
                 if (ended) return C.RESULT_END_OF_INPUT
@@ -338,7 +350,7 @@ private class ReadAheadSession(val key: String, private val file: File, private 
                         isDownloading = false
                         changed.await()
                     }
-                    if (closed) return@withLock null
+                    if (closed || unbounded) return@withLock null
                     if (myGeneration != generation) {
                         myGeneration = generation
                         position = windowEnd
@@ -442,9 +454,21 @@ private class ReadAheadSession(val key: String, private val file: File, private 
                 .firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }
                 ?.value?.firstOrNull()?.lowercase().orEmpty()
             if ("mpegurl" in contentType || "dash+xml" in contentType) adaptive = true
+            val acceptsRanges = responseHeaders.entries
+                .firstOrNull { it.key.equals("Accept-Ranges", ignoreCase = true) }
+                ?.value?.any { it.contains("bytes", ignoreCase = true) } == true
+            if (!adaptive && opened == C.LENGTH_UNSET.toLong() && position == 0L && !acceptsRanges) {
+                unbounded = true
+            }
             error = null
             connected = true
             changed.signalAll()
+        }
+        if (lock.withLock { unbounded }) {
+            // Hand the stream to the player: one connection at a time, so this one closes first.
+            source.closeQuietly()
+            lock.withLock { if (activeSource === source) activeSource = null }
+            return null
         }
         return source
     }
@@ -515,6 +539,7 @@ private class ReadAheadDataSource(
         remaining = dataSpec.length
         if (dataSpec.uri.toString() == session.key && session.serve(position)) {
             val length = session.awaitLength()
+            if (session.readsDirectly) return openDirect(dataSpec)
             fromRing = true
             return when {
                 remaining != C.LENGTH_UNSET.toLong() -> remaining
@@ -522,6 +547,10 @@ private class ReadAheadDataSource(
                 else -> C.LENGTH_UNSET.toLong()
             }
         }
+        return openDirect(dataSpec)
+    }
+
+    private fun openDirect(dataSpec: DataSpec): Long {
         fromRing = false
         directOpen = true
         return direct.open(dataSpec)
