@@ -457,17 +457,23 @@ private class ReadAheadSession(val key: String, private val file: File, private 
             val acceptsRanges = responseHeaders.entries
                 .firstOrNull { it.key.equals("Accept-Ranges", ignoreCase = true) }
                 ?.value?.any { it.contains("bytes", ignoreCase = true) } == true
+            error = null
             if (!adaptive && opened == C.LENGTH_UNSET.toLong() && position == 0L && !acceptsRanges) {
                 unbounded = true
+            } else {
+                connected = true
+                changed.signalAll()
             }
-            error = null
-            connected = true
-            changed.signalAll()
         }
         if (lock.withLock { unbounded }) {
-            // Hand the stream to the player: one connection at a time, so this one closes first.
+            // Hand the stream to the player: one connection at a time, so this one closes
+            // before the waiting open is released to connect directly.
             source.closeQuietly()
-            lock.withLock { if (activeSource === source) activeSource = null }
+            lock.withLock {
+                if (activeSource === source) activeSource = null
+                connected = true
+                changed.signalAll()
+            }
             return null
         }
         return source
