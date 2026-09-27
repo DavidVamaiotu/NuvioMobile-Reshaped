@@ -11,7 +11,10 @@ import dev.chrisbanes.haze.HazeState
  */
 internal class PillGlassLens(val bounds: () -> Rect?, val press: () -> Float)
 
-/** The pill's glass background: refracting liquid glass where the platform supports it, frosted blur elsewhere. */
+/**
+ * The pill's glass background: refracting liquid glass where the platform supports it, frosted blur elsewhere.
+ * Clips itself to the capsule; the liquid glass also swells by [PillGlassLens.press] within its own bounds.
+ */
 @Composable
 internal expect fun PillGlassSurface(hazeState: HazeState?, lens: PillGlassLens?, modifier: Modifier = Modifier)
 

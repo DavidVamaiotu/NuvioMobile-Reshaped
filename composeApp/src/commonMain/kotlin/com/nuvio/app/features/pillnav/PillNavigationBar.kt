@@ -37,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -199,13 +200,10 @@ internal fun PillNavigationBar(
         indicator.moveTo(x, x + width)
     }
 
-    // A finger anywhere on the pill swells the glass and the selection lens. Observed, never consumed.
-    var pressed by remember { mutableStateOf(false) }
-    val press = animateFloatAsState(
-        targetValue = if (pressed) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.62f, stiffness = 420f),
-        label = "pill_nav_glass_press",
-    )
+    // A finger anywhere on the pill swells the glass and the selection lens. Observed, never consumed, and
+    // animated from the pointer coroutine so a tap only redraws, never recomposes the pill.
+    val press = remember { Animatable(0f) }
+    val pressScope = rememberCoroutineScope()
     val refracts = pillGlassRefracts(hazeState)
     val innerPaddingPx = with(density) { PillNavTokens.innerPadding.toPx() }
     val rowHeightPx = with(density) { (PillNavTokens.barHeight - PillNavTokens.innerPadding * 2).toPx() }
@@ -242,25 +240,22 @@ internal fun PillNavigationBar(
                 .fillMaxWidth()
                 .height(PillNavTokens.barHeight)
                 .pointerInput(Unit) {
+                    val pressSpec = spring<Float>(dampingRatio = 0.62f, stiffness = 420f)
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                        pressed = true
+                        pressScope.launch { press.animateTo(1f, pressSpec) }
                         try {
                             do {
                                 val event = awaitPointerEvent(PointerEventPass.Initial)
                             } while (event.changes.any { it.pressed })
                         } finally {
-                            pressed = false
+                            pressScope.launch { press.animateTo(0f, pressSpec) }
                         }
                     }
-                }
-                .graphicsLayer {
-                    val p = press.value
-                    scaleX = 1f + p * 8.dp.toPx() / size.width.coerceAtLeast(1f)
-                    scaleY = 1f + p * 3.dp.toPx() / size.height.coerceAtLeast(1f)
                 },
         ) {
-            PillGlassSurface(hazeState, glassLens.takeIf { selectedIndex >= 0 }, Modifier.matchParentSize().clip(RoundedCornerShape(50)))
+            // The glass swells inside its own layer (see PillGlassSurface), so the blur behind it stays lined up.
+            PillGlassSurface(hazeState, glassLens.takeIf { selectedIndex >= 0 }, Modifier.matchParentSize())
             Row(
                 modifier = Modifier
                     .matchParentSize()

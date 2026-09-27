@@ -9,6 +9,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
@@ -29,7 +31,7 @@ internal actual fun PillGlassSurface(hazeState: HazeState?, lens: PillGlassLens?
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && hazeState?.blurEnabled == true) {
         TintedRefractedGlass(hazeState, lens, MaterialTheme.nuvio.colors.accent, modifier)
     } else {
-        GlassBarSurface(hazeState = hazeState, modifier = modifier, glowStrength = 1f)
+        GlassBarSurface(hazeState = hazeState, modifier = modifier.clip(RoundedCornerShape(50)), glowStrength = 1f)
     }
 }
 
@@ -58,7 +60,11 @@ private fun TintedRefractedGlass(hazeState: HazeState, lens: PillGlassLens?, tin
                 } else {
                     shader.setFloatUniform("lens", 0f, 0f, 0f, 0f)
                 }
-                shader.setFloatUniform("press", lens?.press?.invoke() ?: 0f)
+                val press = lens?.press?.invoke() ?: 0f
+                shader.setFloatUniform("press", press)
+                // The press swell grows the capsule inside the layer's outset instead of scaling the layer,
+                // which would shift the bent backdrop away from where Haze sampled it.
+                shader.setFloatUniform("grow", press * 4.dp.toPx(), press * 1.5.dp.toPx())
                 renderEffect = RenderEffect.createRuntimeShaderEffect(shader, "backdrop").asComposeRenderEffect()
             }
             .hazeEffect(state = hazeState) {
