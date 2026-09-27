@@ -1,1 +1,4 @@
-- **Smoother playback.** Fixes a short judder every 10 to 20 seconds. Seek preview thumbnails are now made while you pause or scrub instead of during playback.
+- **More liquid glass.** The pill menu uses a lighter blur with a lens edge that bends what's behind it, and the selected tab is its own sliding lens. The glass swells slightly when you touch it (Android 13+).
+- **Volume boost.** Swipe past max volume to go up to 200%. The top half of the bar is tinted red, and the boost resets when you close the player. Turn it on under Settings > Nuvio Reshaped.
+- **Library calendar.** An optional release calendar in your Library. Turn it on under Settings > Nuvio Reshaped > Library.
+- The README now describes Nuvio Reshaped.
