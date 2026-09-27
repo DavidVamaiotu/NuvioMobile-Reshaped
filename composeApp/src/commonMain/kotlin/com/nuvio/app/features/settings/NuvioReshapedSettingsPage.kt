@@ -103,6 +103,9 @@ internal fun LazyListScope.nuvioReshapedSettingsContent(isTablet: Boolean) {
         SubtitleFontSettingsSection(isTablet = isTablet)
     }
     item {
+        VolumeBoostSettingsSection(isTablet = isTablet)
+    }
+    item {
         PlaybackBufferSettingsSection(isTablet = isTablet)
     }
     item {

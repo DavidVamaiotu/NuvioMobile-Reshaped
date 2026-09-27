@@ -111,6 +111,7 @@ open class MainActivity : AppCompatActivity() {
         AutoSyncPreferencesAndroid.initialize(applicationContext) // AutoSync hook
         SeekrKeyPreferencesAndroid.initialize(applicationContext) // Seekr hook
         PillNavPreferencesAndroid.initialize(applicationContext) // Pill nav hook
+        com.nuvio.app.features.player.volumeboost.VolumeBoostPreferencesAndroid.initialize(applicationContext) // Volume boost hook
         PlayerTrackPreferenceStorage.initialize(applicationContext)
         P2pSettingsStorage.initialize(applicationContext)
         P2pStreamingEngine.initialize(applicationContext)

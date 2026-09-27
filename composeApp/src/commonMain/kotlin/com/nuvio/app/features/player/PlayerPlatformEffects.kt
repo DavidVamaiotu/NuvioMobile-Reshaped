@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.IntSize
+import com.nuvio.app.features.player.volumeboost.VolumeBoost
 
 interface PlayerGestureController {
     fun currentBrightness(): Float?
@@ -48,7 +49,7 @@ fun rememberPlayerGestureController(): PlayerGestureController? {
         PlayerSettingsStorage.loadPlaybackBrightness()
             ?.takeIf { it in 0f..1f }
             ?.let(controller::setBrightness)
-        onDispose {}
+        onDispose { VolumeBoost.resetSession() } // Nuvio RS: volume boost lasts one session
     }
     return remember(controller) {
         object : PlayerGestureController by controller {
@@ -57,6 +58,10 @@ fun rememberPlayerGestureController(): PlayerGestureController? {
                 return controller.setBrightness(level.coerceIn(0f, 1f))
                     ?.also(PlayerSettingsStorage::savePlaybackBrightness)
             }
+
+            // Nuvio RS: volume boost past 100%
+            override fun currentVolume(): PlayerAudioLevel? = VolumeBoost.currentVolume(controller)
+            override fun setVolume(level: Float): PlayerAudioLevel? = VolumeBoost.setVolume(controller, level)
         }
     }
 }

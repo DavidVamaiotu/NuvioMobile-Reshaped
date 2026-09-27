@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_volume_boost_section">Player</string>
+    <string name="settings_volume_boost_title">Volume boost</string>
+    <string name="settings_volume_boost_description">Swipe the volume bar past 100% up to 200% for quiet movies. The top of the bar turns red while boosted, and the boost resets when you close the player.</string>
+</resources>

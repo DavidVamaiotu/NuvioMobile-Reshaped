@@ -72,6 +72,10 @@ import com.nuvio.app.features.player.audiosync.AudioSyncTaps
 import com.nuvio.app.features.streams.PlaybackThroughputSampler
 import com.nuvio.app.features.streams.normalizeStreamType
 import `is`.xyz.mpv.BaseMPVView
+import com.nuvio.app.features.player.volumeboost.ExoVolumeBoostEffect
+import com.nuvio.app.features.player.volumeboost.LIBMPV_VOLUME_MAX
+import com.nuvio.app.features.player.volumeboost.VolumeBoost
+import com.nuvio.app.features.player.volumeboost.libmpvVolumeForBoost
 import `is`.xyz.mpv.MPV
 import `is`.xyz.mpv.MPVNode
 import `is`.xyz.mpv.Utils
@@ -467,6 +471,7 @@ private fun ExoPlayerSurface(
     DisposableEffect(nowPlayingController) {
         onDispose { nowPlayingController.release() }
     }
+    ExoVolumeBoostEffect(exoPlayer) // Nuvio RS: volume boost
 
     LaunchedEffect(exoPlayer, resolvedMediaItem, initialPositionRequestKey) {
         val mediaItem = resolvedMediaItem
@@ -1206,6 +1211,11 @@ private fun LibmpvPlayerSurface(
         }
     }
 
+    LaunchedEffect(playerViewRef) { // Nuvio RS: volume boost
+        val view = playerViewRef ?: return@LaunchedEffect
+        VolumeBoost.gainDb.collect { view.applyVolumeBoostDb(it) }
+    }
+
     DisposableEffect(playerViewRef) {
         val view = playerViewRef ?: return@DisposableEffect onDispose {}
         PlayerPictureInPictureManager.registerPausePlaybackCallback {
@@ -1377,6 +1387,7 @@ private class NuvioLibmpvView(
         mpv.setOptionString("demuxer-max-back-bytes", "$backBytes").logIfMpvError("demuxer-max-back-bytes")
         mpv.setOptionString("vd-lavc-film-grain", "cpu")
         mpv.setOptionString("sub-fonts-dir", SubtitleFontStore.fontsDir(context).path)
+        mpv.setOptionString("volume-max", LIBMPV_VOLUME_MAX) // Nuvio RS: volume boost
         mpv.setPropertyBoolean("keep-open", true)
         mpv.setPropertyBoolean("input-default-bindings", true)
         mpv.setPropertyBoolean("audio-fallback-to-null", true)
@@ -1731,6 +1742,10 @@ private class NuvioLibmpvView(
 
     private fun setPausedNow(paused: Boolean) {
         runCatching { mpv.setPropertyBoolean("pause", paused) }
+    }
+
+    fun applyVolumeBoostDb(gainDb: Float) { // Nuvio RS: volume boost
+        executeMpv { mpv.setPropertyDouble("volume", libmpvVolumeForBoost(gainDb)) }
     }
 
     private fun executeMpv(block: () -> Unit) {

@@ -9,6 +9,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
+import com.nuvio.app.features.player.volumeboost.VolumeBoost
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -137,7 +138,8 @@ internal fun PlayerScreenRuntime.showBrightnessFeedback(level: Float) {
 }
 
 internal fun PlayerScreenRuntime.showVolumeFeedback(level: PlayerAudioLevel) {
-    val percentage = (level.fraction.coerceIn(0f, 1f) * 100f).roundToInt()
+    val maxLevel = VolumeBoost.maxLevel // Nuvio RS: volume boost
+    val percentage = (level.fraction.coerceIn(0f, maxLevel) * 100f).roundToInt()
     showGestureFeedback(
         GestureFeedbackState(
             messageRes = if (level.isMuted) {
@@ -148,7 +150,7 @@ internal fun PlayerScreenRuntime.showVolumeFeedback(level: PlayerAudioLevel) {
             messageArgs = if (level.isMuted) emptyList() else listOf("$percentage%"),
             icon = if (level.isMuted) GestureFeedbackIcon.VolumeMuted else GestureFeedbackIcon.Volume,
             isDanger = level.isMuted,
-            level = if (level.isMuted) 0f else level.fraction.coerceIn(0f, 1f),
+            level = if (level.isMuted) 0f else level.fraction.coerceIn(0f, maxLevel),
         ),
     )
 }
