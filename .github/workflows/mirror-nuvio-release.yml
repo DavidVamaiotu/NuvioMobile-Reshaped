@@ -1,6 +1,6 @@
 name: AutoSync Release
 
-# Release trigger: Live TV with playback, playlist and program guide fixes, Nuvio upstream sync
+# Release trigger: smoother playback (no preview decoding while playing)
 
 
 on:

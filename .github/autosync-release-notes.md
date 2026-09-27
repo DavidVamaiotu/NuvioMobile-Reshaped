@@ -1,4 +1,1 @@
-- **Live TV (new, optional).** Watch IPTV channels from an M3U playlist, an Xtream account or a Stalker portal, with a program guide and channel switching inside the player. Turn it on in Settings > Nuvio Reshaped to add a Live TV tab to the navigation bar.
-- **Live channels play smoothly.** Live streams no longer freeze after a connection drop, rejoin the live edge on their own when they fall behind, and no longer affect stream speed sorting.
-- **Big playlists stay fast.** Channel lists stay loaded when you come back from a channel, Stalker portals load every channel, imported playlists are stored as files, and large program guides (including .gz) are read without slowing the app.
-- **Also new from Nuvio:** episode shuffle, landscape posters from add-ons, downloads moved into the Library, and restyled dialogs, menus and sheets.
+- **Smoother playback.** Fixes a short judder every 10 to 20 seconds. Seek preview thumbnails are now made while you pause or scrub instead of during playback.
