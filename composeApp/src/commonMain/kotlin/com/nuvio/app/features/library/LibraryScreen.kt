@@ -298,7 +298,11 @@ fun LibraryScreen(
                                 if (sourceMode == LibraryViewMode.Saved) {
                                     if (displaySettings.calendarEnabled) {
                                         IconButton(onClick = { showCalendar = true }) {
-                                            Icon(Icons.Rounded.CalendarMonth, stringResource(Res.string.library_calendar_open))
+                                            Icon(
+                                                imageVector = Icons.Rounded.CalendarMonth,
+                                                contentDescription = stringResource(Res.string.library_calendar_open),
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
                                         }
                                     }
                                     LibraryListManagementButton()
