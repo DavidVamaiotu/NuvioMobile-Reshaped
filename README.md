@@ -10,7 +10,7 @@
     Everything you know from Nuvio, plus subtitles that sync themselves, instant seeking with previews, Live TV and a calmer, more cinematic player.
   </p>
 
-  [Download](https://github.com/DavidVamaiotu/NuvioMobile-AutoSync/releases/latest) · [All releases](https://github.com/DavidVamaiotu/NuvioMobile-AutoSync/releases) · [TV version](https://github.com/DavidVamaiotu/NuvioTV-Reshaped) · [Official Nuvio](https://nuvio.tv)
+  [Download](https://github.com/DavidVamaiotu/NuvioMobile-Reshaped/releases/latest) · [All releases](https://github.com/DavidVamaiotu/NuvioMobile-Reshaped/releases) · [TV version](https://github.com/DavidVamaiotu/NuvioTV-Reshaped) · [Official Nuvio](https://nuvio.tv)
 
 </div>
 
@@ -40,7 +40,7 @@ Nuvio Reshaped tracks official Nuvio closely and only adds on top. Every additio
 
 ## Get it
 
-Download the latest APK from [Releases](https://github.com/DavidVamaiotu/NuvioMobile-AutoSync/releases/latest). Nuvio Reshaped installs as **Nuvio RS**, next to the official app, so you can keep both.
+Download the latest APK from [Releases](https://github.com/DavidVamaiotu/NuvioMobile-Reshaped/releases/latest). Nuvio Reshaped installs as **Nuvio RS**, next to the official app, so you can keep both.
 
 Once installed, it checks this repository for updates and offers them in the app, on a stable or beta channel.
 
@@ -49,8 +49,8 @@ Once installed, it checks this repository for updates and offers them in the app
 Android development requires Android Studio, a JDK and the Android SDK.
 
 ```bash
-git clone -b subtitle-autosync https://github.com/DavidVamaiotu/NuvioMobile-AutoSync.git
-cd NuvioMobile-AutoSync
+git clone -b subtitle-autosync https://github.com/DavidVamaiotu/NuvioMobile-Reshaped.git
+cd NuvioMobile-Reshaped
 ./gradlew :androidApp:assembleFullDebug
 ```
 
