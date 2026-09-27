@@ -28,10 +28,6 @@ import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.core.ui.labelRes
-import com.nuvio.app.features.library.LibraryDisplaySettingsRepository
-import nuvio.composeapp.generated.resources.library_title
-import nuvio.composeapp.generated.resources.settings_library_calendar
-import nuvio.composeapp.generated.resources.settings_library_calendar_description
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.cd_selected
@@ -246,23 +242,6 @@ internal fun LazyListScope.appearanceSettingsContent(
                     description = stringResource(Res.string.settings_appearance_poster_customization_description),
                     isTablet = isTablet,
                     onClick = onPosterCustomizationClick,
-                )
-            }
-        }
-    }
-    item {
-        val librarySettings by remember {
-            LibraryDisplaySettingsRepository.ensureLoaded()
-            LibraryDisplaySettingsRepository.uiState
-        }.collectAsStateWithLifecycle()
-        SettingsSection(title = stringResource(Res.string.library_title), isTablet = isTablet) {
-            SettingsGroup(isTablet = isTablet) {
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_library_calendar),
-                    description = stringResource(Res.string.settings_library_calendar_description),
-                    checked = librarySettings.calendarEnabled,
-                    isTablet = isTablet,
-                    onCheckedChange = LibraryDisplaySettingsRepository::setCalendarEnabled,
                 )
             }
         }

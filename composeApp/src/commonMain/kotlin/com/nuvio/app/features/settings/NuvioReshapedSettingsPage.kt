@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.autosync.bubble.AutoSyncBubbleToasts
+import com.nuvio.app.features.library.LibraryDisplaySettingsRepository
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.rememberSubtitleFontPicker
 import com.nuvio.app.features.reshaped.livetv.LiveTvTabSettings
@@ -19,8 +20,11 @@ import com.nuvio.app.isIos
 import kotlin.math.roundToInt
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_settings_page_streams
+import nuvio.composeapp.generated.resources.library_title
 import nuvio.composeapp.generated.resources.settings_autosync_bubble_toast
 import nuvio.composeapp.generated.resources.settings_autosync_bubble_toast_description
+import nuvio.composeapp.generated.resources.settings_library_calendar
+import nuvio.composeapp.generated.resources.settings_library_calendar_description
 import nuvio.composeapp.generated.resources.settings_nuvio_reshaped
 import nuvio.composeapp.generated.resources.settings_nuvio_reshaped_autosync_section
 import nuvio.composeapp.generated.resources.settings_nuvio_reshaped_description
@@ -74,6 +78,23 @@ internal fun LazyListScope.nuvioReshapedSettingsContent(isTablet: Boolean) {
                     checked = liveTvEnabled,
                     isTablet = isTablet,
                     onCheckedChange = LiveTvTabSettings::setEnabled,
+                )
+            }
+        }
+    }
+    item {
+        val librarySettings by remember {
+            LibraryDisplaySettingsRepository.ensureLoaded()
+            LibraryDisplaySettingsRepository.uiState
+        }.collectAsStateWithLifecycle()
+        SettingsSection(title = stringResource(Res.string.library_title), isTablet = isTablet) {
+            SettingsGroup(isTablet = isTablet) {
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_library_calendar),
+                    description = stringResource(Res.string.settings_library_calendar_description),
+                    checked = librarySettings.calendarEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = LibraryDisplaySettingsRepository::setCalendarEnabled,
                 )
             }
         }
