@@ -89,7 +89,7 @@ internal class AutoSyncPlayerCoordinator(
         },
     )
     /** Lets on-device seek previews collect this stream's keyframes as playback demuxes them. */
-    private val localPreviewSource = LocalPreviewSources.register(context, sourceUrl) { player.isCurrentMediaItemLive }
+    private val localPreviewSource = LocalPreviewSources.register(context, sourceUrl, player)
     private val _retryState = MutableStateFlow(AutoSyncRetryUiState())
     val retryState: StateFlow<AutoSyncRetryUiState> = _retryState.asStateFlow()
 

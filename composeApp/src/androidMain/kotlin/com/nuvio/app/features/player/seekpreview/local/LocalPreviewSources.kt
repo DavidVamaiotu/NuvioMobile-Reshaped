@@ -4,6 +4,7 @@ package com.nuvio.app.features.player.seekpreview.local
 
 import android.content.Context
 import androidx.media3.common.Format
+import androidx.media3.common.Player
 import androidx.media3.extractor.ExtractorsFactory
 import com.nuvio.app.features.player.seekpreview.SeekPreviewTrack
 import com.nuvio.app.features.reshaped.livetv.LiveTvPlaybackRegistry
@@ -17,6 +18,19 @@ internal class LocalPreviewSource(
 ) {
     @Volatile var released = false
     @Volatile var track: LocalPreviewTrack? = null
+
+    /**
+     * False while the viewer has paused. Keyframes are only decoded then (or while scrubbing):
+     * a software decode of a large keyframe takes every core for a moment, which drops frames.
+     */
+    @Volatile var playbackActive = true
+        set(value) {
+            field = value
+            if (!value) track?.onPlaybackPaused()
+        }
+
+    /** Stops following the player's play/pause state; called by [LocalPreviewSources.unregister]. */
+    var detach: (() -> Unit)? = null
 }
 
 /**
@@ -27,8 +41,21 @@ internal class LocalPreviewSource(
 internal object LocalPreviewSources {
     @Volatile private var current: LocalPreviewSource? = null
 
-    fun register(context: Context, sourceUrl: String, isLive: () -> Boolean = { false }): LocalPreviewSource {
-        val source = LocalPreviewSource(sourceKey = sourceUrl, context = context.applicationContext, isLive = isLive)
+    /** Call on the player's thread. */
+    fun register(context: Context, sourceUrl: String, player: Player): LocalPreviewSource {
+        val source = LocalPreviewSource(
+            sourceKey = sourceUrl,
+            context = context.applicationContext,
+            isLive = { player.isCurrentMediaItemLive },
+        )
+        source.playbackActive = player.playWhenReady
+        val listener = object : Player.Listener {
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                source.playbackActive = playWhenReady
+            }
+        }
+        player.addListener(listener)
+        source.detach = { player.removeListener(listener) }
         current?.takeIf { it.sourceKey != sourceUrl }?.let { stale -> stale.track?.close() }
         current = source
         return source
@@ -36,6 +63,8 @@ internal object LocalPreviewSources {
 
     fun unregister(source: LocalPreviewSource) {
         source.released = true
+        source.detach?.invoke()
+        source.detach = null
         source.track?.close()
         source.track = null
         if (current === source) current = null
@@ -48,7 +77,7 @@ internal object LocalPreviewSources {
         source.track = null
         // A live window slides and its keyframe times are not playback positions: no previews.
         if (LiveTvPlaybackRegistry.isLiveTv(source.sourceKey) || source.isLive()) return null
-        val track = LocalPreviewTrack(source, cacheKey, durationMs)
+        val track = LocalPreviewTrack(source, cacheKey, durationMs) { source.playbackActive }
         source.track = track
         track.start()
         return track

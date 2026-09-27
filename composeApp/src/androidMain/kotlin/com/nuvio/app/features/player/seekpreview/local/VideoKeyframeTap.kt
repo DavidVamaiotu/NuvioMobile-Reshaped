@@ -32,7 +32,7 @@ internal interface KeyframeSink {
 /**
  * Wraps every extractor so the video keyframes ExoPlayer downloads are copied to [sink] while
  * being forwarded unchanged to the player. Nothing is downloaded twice; the copy happens at
- * load time, so thumbnails appear as far ahead as playback buffers.
+ * load time, so keyframes are collected as far ahead as playback buffers.
  */
 internal class VideoKeyframeExtractorsFactory(
     private val delegate: ExtractorsFactory,
