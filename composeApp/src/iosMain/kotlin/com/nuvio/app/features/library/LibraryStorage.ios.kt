@@ -11,4 +11,11 @@ actual object LibraryStorage {
     actual fun savePayload(profileId: Int, payload: String) {
         NSUserDefaults.standardUserDefaults.setObject(payload, forKey = payloadKey(profileId))
     }
+
+    actual fun loadCalendarPayload(profileId: Int): String? =
+        NSUserDefaults.standardUserDefaults.stringForKey("library_calendar_v1_$profileId")
+
+    actual fun saveCalendarPayload(profileId: Int, payload: String) {
+        NSUserDefaults.standardUserDefaults.setObject(payload, forKey = "library_calendar_v1_$profileId")
+    }
 }

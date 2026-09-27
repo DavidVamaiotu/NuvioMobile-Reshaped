@@ -22,4 +22,11 @@ actual object LibraryStorage {
             ?.putString(payloadKey(profileId), payload)
             ?.apply()
     }
+
+    actual fun loadCalendarPayload(profileId: Int): String? =
+        preferences?.getString("library_calendar_v1_$profileId", null)
+
+    actual fun saveCalendarPayload(profileId: Int, payload: String) {
+        preferences?.edit()?.putString("library_calendar_v1_$profileId", payload)?.apply()
+    }
 }
