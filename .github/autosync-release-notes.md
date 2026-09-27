@@ -1,4 +1,1 @@
-- **More liquid glass.** The pill menu uses a lighter blur with a lens edge that bends what's behind it, and the selected tab is its own sliding lens. The glass swells slightly when you touch it (Android 13+).
-- **Volume boost.** Swipe past max volume to go up to 200%. The top half of the bar is tinted red, and the boost resets when you close the player. Turn it on under Settings > Nuvio Reshaped.
-- **Library calendar.** An optional release calendar in your Library. Turn it on under Settings > Nuvio Reshaped > Library.
-- The README now describes Nuvio Reshaped.
+- **Library calendar button fixed.** The calendar button in Library was black on the dark header and hard to see. It now matches the other header buttons. Turn the calendar on under Settings > Nuvio Reshaped > Library.
