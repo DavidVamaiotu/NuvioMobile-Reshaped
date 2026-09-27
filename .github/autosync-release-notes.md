@@ -1,1 +1,1 @@
-- **Library calendar button fixed.** The calendar button in Library was black on the dark header and hard to see. It now matches the other header buttons. Turn the calendar on under Settings > Nuvio Reshaped > Library.
+- **AutoSync keeps in-sync subtitles in sync.** On episodes with dense, back-to-back dialogue, AutoSync could move a subtitle that already matched by up to 1.5 seconds. It now checks where the lines actually start, so it picks the exact offset.

@@ -1,6 +1,6 @@
 name: AutoSync Release
 
-# Release trigger: library calendar button color fix
+# Release trigger: AutoSync dense dialogue offset fix
 
 
 on:
