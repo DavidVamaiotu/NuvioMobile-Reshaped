@@ -1,2 +1,4 @@
-- **AudioSync statistics are hidden by default.** The live panel in the player's top-left corner now only appears when you turn on "Show AudioSync statistics" in Settings > Nuvio Reshaped, under AudioSync.
-- **Your subtitle choice is respected on the next playback.** AutoSync no longer saves subtitles Nuvio picked automatically as your preference, so a built-in track in your preferred language is no longer skipped for an add-on subtitle.
+- **Live TV (new, optional).** Watch IPTV channels from an M3U playlist, an Xtream account or a Stalker portal, with a program guide and channel switching inside the player. Turn it on in Settings > Nuvio Reshaped to add a Live TV tab to the navigation bar.
+- **Live channels play smoothly.** Live streams no longer freeze after a connection drop, rejoin the live edge on their own when they fall behind, and no longer affect stream speed sorting.
+- **Big playlists stay fast.** Channel lists stay loaded when you come back from a channel, Stalker portals load every channel, imported playlists are stored as files, and large program guides (including .gz) are read without slowing the app.
+- **Also new from Nuvio:** episode shuffle, landscape posters from add-ons, downloads moved into the Library, and restyled dialogs, menus and sheets.

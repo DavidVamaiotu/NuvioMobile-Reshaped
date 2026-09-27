@@ -1,6 +1,6 @@
 name: AutoSync Release
 
-# Release trigger: AudioSync statistics hidden by default, subtitle preference fix, Nuvio Reshaped release titles
+# Release trigger: Live TV with playback, playlist and program guide fixes, Nuvio upstream sync
 
 
 on:
