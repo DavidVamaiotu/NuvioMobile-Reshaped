@@ -1,16 +1,38 @@
 package com.nuvio.app.features.reshaped.livetv
 
+import androidx.compose.runtime.Composable
 import com.nuvio.app.features.player.PlayerScreenRuntime
 import com.nuvio.app.features.player.sanitizePlaybackHeaders
+import kotlinx.coroutines.launch
 
-/** The sole player state adapter for Reshaped Live TV channel switching. */
-internal fun PlayerScreenRuntime.switchToReshapedLiveTvChannel(channel: LiveTvChannel) {
-    LiveTvRepository.recordRecentChannel(channel)
-    if (channel.streamUrl == activeSourceUrl) {
+/** The in-player channel list, shown from the player's Channels button. */
+@Composable
+internal fun PlayerScreenRuntime.ReshapedLiveTvChannelsOverlay() {
+    LiveTvChannelsPanel(
+        visible = showReshapedLiveTvChannelsPanel,
+        currentStreamUrl = activeSourceUrl,
+        onChannelSelected = { channel ->
+            scope.launch { switchToReshapedLiveTvChannel(channel) }
+        },
+        onDismiss = {
+            showReshapedLiveTvChannelsPanel = false
+            controlsVisible = true
+        },
+    )
+}
+
+/**
+ * The sole player state adapter for Reshaped Live TV channel switching. [listChannel] is the
+ * list's entry; the link it plays from is resolved here.
+ */
+internal suspend fun PlayerScreenRuntime.switchToReshapedLiveTvChannel(listChannel: LiveTvChannel) {
+    LiveTvRepository.recordRecentChannel(listChannel)
+    if (listChannel.streamUrl == LiveTvPlaybackRegistry.listUrlFor(activeSourceUrl)) {
         showReshapedLiveTvChannelsPanel = false
         controlsVisible = true
         return
     }
+    val channel = LiveTvRepository.prepareForPlayback(listChannel)
 
     activeSourceUrl = channel.streamUrl
     activeSourceAudioUrl = null

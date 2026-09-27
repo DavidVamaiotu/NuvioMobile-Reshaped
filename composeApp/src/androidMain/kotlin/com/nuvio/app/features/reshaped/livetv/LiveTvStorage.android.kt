@@ -2,6 +2,7 @@ package com.nuvio.app.features.reshaped.livetv
 
 import android.content.Context
 import android.content.SharedPreferences
+import java.io.File
 
 actual object LiveTvStorage {
     private const val preferencesName = "nuvio_live_tv"
@@ -24,6 +25,8 @@ actual object LiveTvStorage {
     private const val recentChannelTvgIdKey = "recent_channel_tvg_id"
 
     private var preferences: SharedPreferences? = null
+    /** Imported playlists can be megabytes, so they live in files, not in the preferences. */
+    private var playlistDir: File? = null
 
     private fun resolvedProfileId(): Int = resolveLiveTvStorageProfileId()
 
@@ -48,7 +51,40 @@ actual object LiveTvStorage {
     }
 
     fun initialize(context: Context) {
-        preferences = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
+        preferences = prefs
+        val dir = File(context.filesDir, "live_tv")
+        playlistDir = dir
+        // Earlier builds kept imported playlists in the preferences; move them out once.
+        Thread({ migratePlaylistsFromPreferences(prefs, dir) }, "NuvioLiveTvStorage").apply {
+            isDaemon = true
+        }.start()
+    }
+
+    private fun migratePlaylistsFromPreferences(prefs: SharedPreferences, dir: File) {
+        runCatching {
+            val legacy = prefs.all.filterKeys { it == localPlaylistDataKey || it.startsWith("${localPlaylistDataKey}_") }
+            if (legacy.isEmpty()) return
+            legacy.forEach { (key, value) ->
+                val data = value as? String ?: return@forEach
+                val profileId = if (key == localPlaylistDataKey) 1 else key.substringAfterLast('_').toIntOrNull() ?: return@forEach
+                val file = playlistFile(dir, profileId)
+                if (data.isNotBlank() && !file.exists()) writePlaylist(file, data)
+            }
+            prefs.edit().apply { legacy.keys.forEach(::remove) }.apply()
+        }
+    }
+
+    private fun playlistFile(dir: File, profileId: Int): File = File(dir, "playlist_$profileId.m3u")
+
+    private fun writePlaylist(file: File, data: String) {
+        file.parentFile?.mkdirs()
+        val temp = File(file.path + ".tmp")
+        temp.writeText(data)
+        if (!temp.renameTo(file)) {
+            file.delete()
+            temp.renameTo(file)
+        }
     }
 
     actual fun loadTabEnabled(): Boolean = preferences?.getBoolean(tabEnabledKey, false) ?: false
@@ -79,13 +115,32 @@ actual object LiveTvStorage {
         }?.apply()
     }
 
-    actual fun loadLocalPlaylistData(): String? =
-        preferences?.getScopedString(localPlaylistDataKey)
+    actual fun hasLocalPlaylistData(): Boolean {
+        val dir = playlistDir ?: return false
+        return playlistFile(dir, resolvedProfileId()).let { it.exists() && it.length() > 0L } ||
+            preferences?.getScopedString(localPlaylistDataKey)?.isNotBlank() == true
+    }
 
+    /** Reads a file: call off the main thread. */
+    actual fun loadLocalPlaylistData(): String? {
+        val dir = playlistDir ?: return null
+        val file = playlistFile(dir, resolvedProfileId())
+        return runCatching { file.takeIf(File::exists)?.readText() }.getOrNull()?.takeIf(String::isNotBlank)
+            ?: preferences?.getScopedString(localPlaylistDataKey) // not migrated yet
+    }
+
+    /** Writes a file: call off the main thread. Blank removes the playlist. */
     actual fun saveLocalPlaylistData(data: String) {
-        preferences?.edit()?.apply {
-            putScopedString(localPlaylistDataKey, data)
-        }?.apply()
+        val dir = playlistDir ?: return
+        val file = playlistFile(dir, resolvedProfileId())
+        if (data.isBlank()) {
+            file.delete()
+            if (preferences?.getScopedString(localPlaylistDataKey) != null) {
+                preferences?.edit()?.apply { putScopedString(localPlaylistDataKey, null) }?.apply()
+            }
+        } else {
+            runCatching { writePlaylist(file, data) }
+        }
     }
 
     actual fun loadStalkerSettings(): LiveTvStalkerSettings =

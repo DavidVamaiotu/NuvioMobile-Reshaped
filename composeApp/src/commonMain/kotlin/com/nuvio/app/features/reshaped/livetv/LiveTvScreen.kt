@@ -155,7 +155,7 @@ fun LiveTvScreen(
                     LiveTvRepository.loadXtream(source.xtreamSettings)
                 source.sourceType == LiveTvSourceType.Stalker && source.stalkerSettings.isConfigured ->
                     LiveTvRepository.loadStalker(source.stalkerSettings)
-                LiveTvStorage.loadLocalPlaylistData().orEmpty().isNotBlank() ->
+                LiveTvStorage.hasLocalPlaylistData() ->
                     LiveTvRepository.loadStoredLocalPlaylist()
                 source.sourceUrl.isNotBlank() ->
                     LiveTvRepository.load(source.sourceUrl)
@@ -163,12 +163,12 @@ fun LiveTvScreen(
         }
     }
 
-    val groups = remember(uiState.channels) {
-        uiState.channels
-            .filterNot { isLikelyCategoryHeading(it.name) }
-            .map { it.group }
+    val listedChannels = remember(uiState.channels) {
+        uiState.channels.filterNot { isLikelyCategoryHeading(it.name) }
+    }
+    val groups = remember(listedChannels) {
+        listedChannels.mapTo(LinkedHashSet()) { it.group }
             .filter { it.isNotBlank() }
-            .distinct()
             .sorted()
     }
     val recentChannel = remember(uiState.recentChannel, uiState.channels) {
@@ -186,8 +186,8 @@ fun LiveTvScreen(
             }
         }
     }
-    val visibleChannels = remember(uiState.channels, uiState.favoriteUrls, query, selectedGroup, favoritesOnly) {
-        uiState.channels.filterNot { isLikelyCategoryHeading(it.name) }.filter { channel ->
+    val visibleChannels = remember(listedChannels, uiState.favoriteUrls, query, selectedGroup, favoritesOnly) {
+        listedChannels.filter { channel ->
             (selectedGroup.isBlank() || channel.group == selectedGroup) &&
                 (!favoritesOnly || channel.streamUrl in uiState.favoriteUrls) &&
                 (query.isBlank() || channel.name.contains(query, ignoreCase = true))
@@ -342,7 +342,7 @@ fun LiveTvScreen(
                                             LiveTvRepository.loadXtream(uiState.xtreamSettings)
                                         uiState.sourceType == LiveTvSourceType.Stalker ->
                                             LiveTvRepository.loadStalker(uiState.stalkerSettings)
-                                        LiveTvStorage.loadLocalPlaylistData().orEmpty().isNotBlank() ->
+                                        LiveTvStorage.hasLocalPlaylistData() ->
                                             LiveTvRepository.loadStoredLocalPlaylist()
                                         else ->
                                             LiveTvRepository.load(uiState.sourceUrl)

@@ -13,6 +13,7 @@ import com.nuvio.app.features.player.PlayerSubtitleUtils
 import com.nuvio.app.features.player.SidecarSubtitleController
 import com.nuvio.app.features.player.audiosync.AudioSyncFallback
 import com.nuvio.app.features.player.seekpreview.local.LocalPreviewSources
+import com.nuvio.app.features.reshaped.livetv.LiveTvPlaybackRegistry
 import androidx.media3.datasource.DataSource
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.autosync_toast_analyzing
@@ -88,7 +89,7 @@ internal class AutoSyncPlayerCoordinator(
         },
     )
     /** Lets on-device seek previews collect this stream's keyframes as playback demuxes them. */
-    private val localPreviewSource = LocalPreviewSources.register(context, sourceUrl)
+    private val localPreviewSource = LocalPreviewSources.register(context, sourceUrl) { player.isCurrentMediaItemLive }
     private val _retryState = MutableStateFlow(AutoSyncRetryUiState())
     val retryState: StateFlow<AutoSyncRetryUiState> = _retryState.asStateFlow()
 
@@ -96,7 +97,8 @@ internal class AutoSyncPlayerCoordinator(
         // The coordinator is created when the stream opens. Start the embedded index download
         // now so it overlaps player startup instead of beginning when a subtitle is selected.
         AutoSyncPreferencesRepository.ensureLoaded()
-        if (AutoSyncPreferencesRepository.preferredSubtitleAutoSyncOnStart.value) {
+        // Live TV channels have no embedded index, and a second connection can get the stream refused.
+        if (AutoSyncPreferencesRepository.preferredSubtitleAutoSyncOnStart.value && !LiveTvPlaybackRegistry.isLiveTv(sourceUrl)) {
             EmbeddedSubtitleTimelineLoader.prefetch(scope, sourceUrl, sourceHeaders)
         }
     }

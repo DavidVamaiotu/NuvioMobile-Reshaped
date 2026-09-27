@@ -2,12 +2,27 @@ package com.nuvio.app.features.reshaped.livetv
 
 import platform.Foundation.NSDate
 import platform.Foundation.NSDateFormatter
+import platform.Foundation.NSDateFormatterNoStyle
+import platform.Foundation.NSDateFormatterShortStyle
 import platform.Foundation.NSLocale
+import platform.Foundation.NSTimeZone
+import platform.Foundation.dateWithTimeIntervalSince1970
+import platform.Foundation.localTimeZone
 import platform.Foundation.localeWithLocaleIdentifier
 import platform.Foundation.timeIntervalSince1970
 
 actual object LiveTvClock {
+    private val clockFormatter = NSDateFormatter().apply {
+        dateStyle = NSDateFormatterNoStyle
+        timeStyle = NSDateFormatterShortStyle
+    }
+
     actual fun nowEpochMs(): Long = (NSDate().timeIntervalSince1970 * 1000.0).toLong()
+
+    actual fun timeZoneId(): String = NSTimeZone.localTimeZone.name
+
+    actual fun formatClock(epochMs: Long): String =
+        clockFormatter.stringFromDate(NSDate.dateWithTimeIntervalSince1970(epochMs / 1_000.0))
 
     actual fun parseXmlTvTimestamp(value: String): Long? {
         val parts = value.trim().split(Regex("\\s+"), limit = 2)

@@ -102,6 +102,8 @@ internal fun normalizeMimeType(contentType: String?): String? {
         "video/mkv",
         "audio/mkv" -> MimeTypes.VIDEO_MATROSKA
 
+        "video/mp2t" -> MimeTypes.VIDEO_MP2T // Nuvio RS: live TV transport streams
+
         else -> null
     }
 }
@@ -205,7 +207,7 @@ internal fun probeMimeType(url: String, headers: Map<String, String>): String? {
                 connectTimeout = 3_000
                 readTimeout = 3_000
                 instanceFollowRedirects = true
-                setRequestProperty("User-Agent", "Mozilla/5.0")
+                setRequestProperty("User-Agent", PlayerPlaybackNetworking.DEFAULT_USER_AGENT) // Nuvio RS: same UA as playback
                 setRequestProperty("Accept", "*/*")
                 headers.forEach { (key, value) ->
                     setRequestProperty(key, value)

@@ -1,5 +1,6 @@
 package com.nuvio.app.features.streams
 
+import com.nuvio.app.features.reshaped.livetv.LiveTvPlaybackRegistry
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -136,7 +137,8 @@ internal class PlaybackThroughputSampler(
     private val networkGeneration: () -> Int = ::currentNetworkGeneration,
     private val onSample: (NetworkKind, Double) -> Unit = ConnectionSpeedEstimator::record,
 ) {
-    private val isEligible = sourceUrl.isInternetPlaybackSource()
+    // Live TV channels only arrive at their own bitrate, which says nothing about the connection.
+    private val isEligible = sourceUrl.isInternetPlaybackSource() && !LiveTvPlaybackRegistry.isLiveTv(sourceUrl)
     private var lastTick: TimeMark? = null
     private var warmupMs = 0L
     private var activeBytes = 0L
