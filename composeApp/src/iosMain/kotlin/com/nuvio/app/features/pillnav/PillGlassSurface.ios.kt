@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -16,6 +17,7 @@ import dev.chrisbanes.haze.hazeEffect
 internal actual fun PillGlassSurface(hazeState: HazeState?, lens: PillGlassLens?, modifier: Modifier) {
     Box(
         modifier
+            .clip(RoundedCornerShape(50))
             .then(if (hazeState != null) Modifier.hazeEffect(state = hazeState) { blurRadius = 24.dp } else Modifier)
             .background(Color(0xFF1C1C1E).copy(alpha = if (hazeState != null) 0.5f else 0.82f))
             .border(

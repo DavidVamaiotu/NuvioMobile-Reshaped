@@ -15,6 +15,7 @@ uniform float outset;
 uniform half3 tint;
 uniform float4 lens;
 uniform float press;
+uniform float2 grow;
 
 float circleMap(float x) {
     return 1.0 - sqrt(1.0 - x * x);
@@ -30,7 +31,7 @@ float3 capsule(float2 local, float2 halfSize) {
 }
 
 half4 main(float2 position) {
-    float2 halfSize = resolution * 0.5 - outset;
+    float2 halfSize = resolution * 0.5 - outset + grow;
     float3 bar = capsule(position - resolution * 0.5, halfSize);
     float sd = bar.x;
     float coverage = 1.0 - smoothstep(-0.5, 0.5, sd);
