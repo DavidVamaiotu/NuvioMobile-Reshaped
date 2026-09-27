@@ -55,6 +55,11 @@ import com.nuvio.app.features.profiles.AvatarRepository
 import com.nuvio.app.features.profiles.ProfileRepository
 import kotlinx.coroutines.coroutineScope
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -194,6 +199,26 @@ internal fun PillNavigationBar(
         indicator.moveTo(x, x + width)
     }
 
+    // A finger anywhere on the pill swells the glass and the selection lens. Observed, never consumed.
+    var pressed by remember { mutableStateOf(false) }
+    val press = animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.62f, stiffness = 420f),
+        label = "pill_nav_glass_press",
+    )
+    val refracts = pillGlassRefracts(hazeState)
+    val innerPaddingPx = with(density) { PillNavTokens.innerPadding.toPx() }
+    val rowHeightPx = with(density) { (PillNavTokens.barHeight - PillNavTokens.innerPadding * 2).toPx() }
+    val glassLens = remember(indicator, rowHeightPx, innerPaddingPx) {
+        PillGlassLens(
+            bounds = {
+                if (!indicator.placed) null
+                else indicator.bounds(rowHeightPx, press.value).translate(innerPaddingPx, innerPaddingPx)
+            },
+            press = { press.value },
+        )
+    }
+
     val profileState by ProfileRepository.state.collectAsStateWithLifecycle()
     val avatars by AvatarRepository.avatars.collectAsStateWithLifecycle()
 
@@ -215,14 +240,32 @@ internal fun PillNavigationBar(
             modifier = Modifier
                 .widthIn(max = PillNavTokens.barMaxWidth)
                 .fillMaxWidth()
-                .height(PillNavTokens.barHeight),
+                .height(PillNavTokens.barHeight)
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        pressed = true
+                        try {
+                            do {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                            } while (event.changes.any { it.pressed })
+                        } finally {
+                            pressed = false
+                        }
+                    }
+                }
+                .graphicsLayer {
+                    val p = press.value
+                    scaleX = 1f + p * 8.dp.toPx() / size.width.coerceAtLeast(1f)
+                    scaleY = 1f + p * 3.dp.toPx() / size.height.coerceAtLeast(1f)
+                },
         ) {
-            PillGlassSurface(hazeState, Modifier.matchParentSize().clip(RoundedCornerShape(50)))
+            PillGlassSurface(hazeState, glassLens.takeIf { selectedIndex >= 0 }, Modifier.matchParentSize().clip(RoundedCornerShape(50)))
             Row(
                 modifier = Modifier
                     .matchParentSize()
                     .padding(PillNavTokens.innerPadding)
-                    .drawBehind { if (selectedIndex >= 0) drawLiquidIndicator(indicator) },
+                    .drawBehind { if (selectedIndex >= 0) drawLiquidIndicator(indicator, press.value, refracts) },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 tabs.forEachIndexed { index, tab ->
@@ -297,24 +340,33 @@ private class LiquidIndicator {
 
     /** 0 at rest, towards 1 while stretched in flight. */
     fun stretch(): Float = ((right.value - left.value) / restWidth - 1f).coerceIn(0f, 1.5f) / 1.5f
+
+    /** The lens in row coordinates: thinner while stretched in flight, a little taller and wider while pressed. */
+    fun bounds(rowHeight: Float, press: Float): Rect {
+        val height = rowHeight * (1f - 0.16f * stretch()) * (1f + 0.12f * press)
+        val grow = rowHeight * 0.06f * press
+        val top = (rowHeight - height) / 2f
+        return Rect(left.value - grow, top, right.value + grow, top + height)
+    }
 }
 
-private fun DrawScope.drawLiquidIndicator(indicator: LiquidIndicator) {
+private fun DrawScope.drawLiquidIndicator(indicator: LiquidIndicator, press: Float, refracts: Boolean) {
     if (!indicator.placed) return
-    val stretch = indicator.stretch()
-    val squash = 1f - 0.16f * stretch
-    val height = size.height * squash
-    val top = (size.height - height) / 2f
-    val width = indicator.right.value - indicator.left.value
-    val topLeft = Offset(indicator.left.value, top)
+    val bounds = indicator.bounds(size.height, press)
+    val height = bounds.height
+    val top = bounds.top
+    val width = bounds.width
+    val topLeft = bounds.topLeft
     val lensSize = Size(width, height)
     val radius = CornerRadius(height / 2f)
+    // Where the glass refracts, the lens and its rim come from the shader; this only adds a whisper of frost.
+    val fill = if (refracts) 0.35f else 1f
     // Glass lens: a bright top falling to a soft base, a specular rim, and a faint inner glow.
     drawRoundRect(
         brush = Brush.verticalGradient(
-            0f to Color.White.copy(alpha = 0.30f),
-            0.55f to Color.White.copy(alpha = 0.16f),
-            1f to Color.White.copy(alpha = 0.22f),
+            0f to Color.White.copy(alpha = 0.30f * fill),
+            0.55f to Color.White.copy(alpha = 0.16f * fill),
+            1f to Color.White.copy(alpha = 0.22f * fill),
             startY = top,
             endY = top + height,
         ),
@@ -322,6 +374,7 @@ private fun DrawScope.drawLiquidIndicator(indicator: LiquidIndicator) {
         size = lensSize,
         cornerRadius = radius,
     )
+    if (refracts) return
     val rim = 1.dp.toPx()
     drawRoundRect(
         brush = Brush.verticalGradient(

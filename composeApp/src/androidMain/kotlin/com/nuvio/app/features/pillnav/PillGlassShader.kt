@@ -1,54 +1,91 @@
 package com.nuvio.app.features.pillnav
 
-// Nuvio's GlassBarShader with its fixed warm rim sheen swapped for a `tint` uniform (the app accent).
+// Liquid glass for the pill, one pass over a lightly blurred backdrop:
+// - the whole capsule is a lens: content is pulled inward along the edge normal with a circular
+//   profile, so it magnifies towards the rim like a thick glass edge;
+// - faint, ordered dispersion (red bends least, blue most) only near the rim;
+// - a vibrancy boost and a light tint instead of a heavy grey wash;
+// - a thin specular line lit from the top left, with a dimmer echo bottom right;
+// - the selected tab is a second, smaller lens that magnifies what is under it and swells on press.
 internal const val PillGlassShader = """
 uniform shader backdrop;
 uniform float2 resolution;
 uniform float density;
 uniform float outset;
-uniform float glowStrength;
 uniform half3 tint;
+uniform float4 lens;
+uniform float press;
 
-half3 sampleLight(float2 position, float2 tangent) {
-    float2 spread = tangent * density * 10.0;
-    return backdrop.eval(position).rgb * 0.5
-        + backdrop.eval(position - spread).rgb * 0.25
-        + backdrop.eval(position + spread).rgb * 0.25;
+float circleMap(float x) {
+    return 1.0 - sqrt(1.0 - x * x);
+}
+
+// Signed distance to a horizontal capsule and its outward normal, packed as (distance, normal.x, normal.y).
+float3 capsule(float2 local, float2 halfSize) {
+    float radius = halfSize.y;
+    float2 q = float2(max(abs(local.x) - halfSize.x + radius, 0.0), local.y);
+    float d = length(q);
+    float2 n = float2(q.x * sign(local.x), q.y) / max(d, 0.001);
+    return float3(d - radius, n);
 }
 
 half4 main(float2 position) {
     float2 halfSize = resolution * 0.5 - outset;
-    float radius = halfSize.y;
-    float2 local = position - resolution * 0.5;
-    float2 capsule = float2(max(abs(local.x) - halfSize.x + radius, 0.0), local.y);
-    float distanceToCenter = length(capsule);
-    float distanceToEdge = distanceToCenter - radius;
-    float coverage = 1.0 - smoothstep(-0.5, 0.5, distanceToEdge);
+    float3 bar = capsule(position - resolution * 0.5, halfSize);
+    float sd = bar.x;
+    float coverage = 1.0 - smoothstep(-0.5, 0.5, sd);
     if (coverage <= 0.0) return half4(0.0);
+    float2 normal = bar.yz;
 
-    float2 normal = float2(capsule.x * sign(local.x), capsule.y)
-        / max(distanceToCenter, 0.001);
-    float2 tangent = float2(-normal.y, normal.x);
-    float depth = max(-distanceToEdge, 0.0) / density;
-    half3 surface = mix(backdrop.eval(position).rgb, mix(half3(28.0, 28.0, 30.0) / 255.0, tint, 0.06), 0.55);
-    if (depth >= 16.0 || glowStrength <= 0.0) return half4(surface * coverage, coverage);
+    // 0 deep inside, 1 at the rim.
+    float edge = clamp(1.0 + sd / (22.0 * density), 0.0, 1.0);
+    float bend = circleMap(edge) * 20.0 * density;
+    float2 samplePos = position - normal * bend;
+    float2 spread = normal * bend * 0.07 * edge;
 
-    float rim = exp(-0.0565 * depth - 0.0322 * depth * depth);
-    float upperLight = 0.18 + 0.82 * pow(max(-normal.y, 0.0), 0.65);
-    float bend = pow(rim, 0.18);
+    float lensMix = 0.0;
+    float lensRim = 0.0;
+    float2 lensNormal = float2(0.0);
+    if (lens.z > lens.x) {
+        float2 lensCenter = (lens.xy + lens.zw) * 0.5;
+        float2 lensHalf = (lens.zw - lens.xy) * 0.5;
+        float3 l = capsule(position - lensCenter, lensHalf);
+        lensMix = 1.0 - smoothstep(-0.5, 0.5, l.x);
+        if (lensMix > 0.0) {
+            float lensEdge = clamp(1.0 + l.x / lensHalf.y, 0.0, 1.0);
+            float magnify = 0.9 - 0.04 * press;
+            float2 lensSamplePos = lensCenter + (samplePos - lensCenter) * magnify
+                - l.yz * circleMap(lensEdge) * lensHalf.y * 0.45;
+            samplePos = mix(samplePos, lensSamplePos, lensMix);
+            spread += l.yz * circleMap(lensEdge) * 1.5 * density * lensMix;
+            lensRim = smoothstep(1.5 * density, 0.0, -l.x) * lensMix;
+            lensNormal = l.yz;
+        }
+    }
 
-    half3 redLight = sampleLight(position - normal * density * 16.0 * bend, tangent);
-    half3 greenLight = sampleLight(position - normal * density * 62.0 * bend, tangent);
-    half3 blueLight = sampleLight(position - normal * density * 57.0 * bend, tangent);
-    half3 refracted = half3(redLight.r, greenLight.g, blueLight.b);
-    half luminance = dot(refracted, half3(0.2126, 0.7152, 0.0722));
-    refracted = clamp(mix(half3(luminance), refracted, 1.25), 0.0, 1.0);
+    half3 color = half3(
+        backdrop.eval(samplePos + spread).r,
+        backdrop.eval(samplePos).g,
+        backdrop.eval(samplePos - spread).b
+    );
+    half luminance = dot(color, half3(0.2126, 0.7152, 0.0722));
+    color = clamp(mix(half3(luminance), color, 1.45), 0.0, 1.0);
+    color = mix(color, mix(half3(28.0, 28.0, 30.0) / 255.0, tint, 0.08), 0.38);
 
-    half3 sheen = tint * 0.2 + refracted * mix(half3(0.26), tint, 0.35) * 0.9;
-    half3 color = surface + sheen * rim * upperLight * glowStrength;
-    float highlight = exp(-pow((depth - 0.35) / 0.42, 2.0));
-    float highlightLight = 0.12 + 0.88 * sqrt(max((1.0 - normal.y) * 0.5, 0.0));
-    color += half3(0.25) * highlight * highlightLight * glowStrength;
+    // Thickness: the glass darkens slightly towards its lower rim, and the selected lens is a touch brighter.
+    color *= 1.0 - 0.14 * pow(edge, 3.0) * max(normal.y, 0.0);
+    color = mix(color, half3(1.0), (0.07 + 0.05 * press) * lensMix);
+    color += tint * 0.05 * pow(edge, 3.0);
+
+    float2 light = float2(-0.7071, -0.7071);
+    float facing = dot(normal, light);
+    float rimLine = smoothstep(1.6 * density, 0.0, -sd);
+    float specular = rimLine * pow(abs(facing), 1.6) * (facing > 0.0 ? 0.55 : 0.2);
+    specular += pow(edge, 4.0) * max(facing, 0.0) * 0.08;
+    float lensFacing = dot(lensNormal, light);
+    specular += lensRim * pow(abs(lensFacing), 1.4) * (lensFacing > 0.0 ? 0.42 : 0.16);
+    color += half3(specular);
+
     return half4(clamp(color, 0.0, 1.0) * coverage, coverage);
 }
 """

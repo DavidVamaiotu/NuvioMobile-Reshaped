@@ -13,7 +13,7 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
 
 @Composable
-internal actual fun PillGlassSurface(hazeState: HazeState?, modifier: Modifier) {
+internal actual fun PillGlassSurface(hazeState: HazeState?, lens: PillGlassLens?, modifier: Modifier) {
     Box(
         modifier
             .then(if (hazeState != null) Modifier.hazeEffect(state = hazeState) { blurRadius = 24.dp } else Modifier)
@@ -25,3 +25,5 @@ internal actual fun PillGlassSurface(hazeState: HazeState?, modifier: Modifier) 
             ),
     )
 }
+
+internal actual fun pillGlassRefracts(hazeState: HazeState?): Boolean = false
