@@ -367,6 +367,7 @@ internal fun StreamDestination(
     )
     val useLandscapeLoading = autoPlayNavigationStarted || streamsUiState.shouldUseLandscapeAutoPlayLoading(
         expectedRequestToken = expectedStreamsRequestToken,
+        settings = playerSettings,
         manualSelection = launch.manualSelection,
     )
     SideEffect { onLandscapeLoadingChanged(useLandscapeLoading) }

@@ -429,8 +429,8 @@
     <string name="compose_player_color">Color</string>
     <string name="compose_player_currently_playing">Currently playing</string>
     <string name="compose_player_episode_code_episode_only">E%1$d</string>
-    <string name="compose_player_episode_code_full">S%1$dE%2$d</string>
-    <string name="compose_player_episode_title_format">S%1$dE%2$d • %3$s</string>
+    <string name="compose_player_episode_code_full">S%1$d E%2$d</string>
+    <string name="compose_player_episode_title_format">S%1$d E%2$d • %3$s</string>
     <string name="compose_player_episodes">Episodes</string>
     <string name="compose_player_font_size">Font Size</string>
     <string name="compose_player_font_size_value">%1$dsp</string>
@@ -1393,7 +1393,7 @@
     <string name="custom_theme_preview_accent">Your accent</string>
     <string name="player_next_episode">Next Episode</string>
     <string name="player_next_episode_finding_source">Finding source…</string>
-    <string name="player_next_episode_playing_via_countdown">Playing via %1$s in %2$d…</string>
+    <string name="player_next_episode_playing_via_countdown">Playing via %1$s in %2$ds…</string>
     <string name="player_next_episode_thumbnail">Next episode thumbnail</string>
     <string name="player_next_episode_unaired">Unaired</string>
     <string name="player_skip">Skip</string>
@@ -1629,7 +1629,7 @@
     <string name="streams_empty_no_streams_message">None of your installed addons returned streams for this title.</string>
     <string name="streams_episode_badge">S%1$d E%2$d</string>
     <string name="streams_episode_fallback_title">Episode</string>
-    <string name="streams_episode_title_with_name">S%1$dE%2$d - %3$s</string>
+    <string name="streams_episode_title_with_name">S%1$d E%2$d - %3$s</string>
     <string name="streams_fetching">Fetching…</string>
     <string name="streams_finding_source">Finding stream source</string>
     <string name="playback_show_loading_status">Show loading status</string>
@@ -1704,7 +1704,7 @@
     <string name="auth_sign_up_failed">Sign-up failed</string>
     <string name="catalog_load_failed">Unable to load catalog items.</string>
     <string name="continue_watching_up_next">Next Up</string>
-    <string name="continue_watching_up_next_episode">Next Up • S%1$dE%2$d</string>
+    <string name="continue_watching_up_next_episode">Next Up • S%1$d E%2$d</string>
     <string name="detail_logo_content_description">%1$s logo</string>
     <string name="details_comments_load_failed">Failed to load comments</string>
     <string name="details_load_failed_all_addons">Could not load details from any addon.</string>
@@ -2376,4 +2376,22 @@
     <string name="shuffle_change_selection">Choose episodes</string>
     <string name="shuffle_badge">Episode shuffle enabled</string>
     <string name="shuffle_unwatched">Unwatched</string>
+    <string name="series_status_ended">Ended</string>
+    <string name="series_status_continuing">Ongoing</string>
+    <string name="series_status_current">Current</string>
+    <string name="series_status_cancelled">Cancelled</string>
+    <string name="series_status_released">Released</string>
+    <string name="series_status_planned">Planned</string>
+    <string name="series_status_rumored">Rumored</string>
+    <string name="series_status_in_production">In Production</string>
+    <string name="series_status_post_production">Post Production</string>
+    <string name="movie_status_ended">Ended</string>
+    <string name="movie_status_continuing">Ongoing</string>
+    <string name="movie_status_current">Current</string>
+    <string name="movie_status_cancelled">Cancelled</string>
+    <string name="movie_status_released">Released</string>
+    <string name="movie_status_planned">Planned</string>
+    <string name="movie_status_rumored">Rumored</string>
+    <string name="movie_status_in_production">In Production</string>
+    <string name="movie_status_post_production">Post Production</string>
 </resources>

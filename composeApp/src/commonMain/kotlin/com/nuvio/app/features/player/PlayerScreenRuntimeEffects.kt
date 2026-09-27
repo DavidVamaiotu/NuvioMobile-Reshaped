@@ -1,5 +1,6 @@
 package com.nuvio.app.features.player
 
+import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.shuffle.EpisodeShuffleRepository
 import com.nuvio.app.features.shuffle.ShuffleSurface
@@ -355,6 +356,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
     DisposableEffect(Unit) {
         PlayerStreamsRepository.pauseSearchForPlayback()
         onDispose {
+            args.launchId?.let { launchId -> PlayerLaunchStore.update(launchId) { currentLaunch(it) } }
             playerController?.clearNowPlayingInfo()
             P2pStreamingEngine.shutdown()
             PlayerStreamsRepository.clearAll()
@@ -690,9 +692,7 @@ private fun buildNowPlayingSubtitle(
     if (!isEpisode) return null
 
     val episodeParts = buildList {
-        if (seasonNumber != null && episodeNumber != null) {
-            add("S${seasonNumber}E${episodeNumber}")
-        }
+        localizedSeasonEpisodeCode(seasonNumber, episodeNumber)?.let { add(it) }
         episodeTitle?.takeIf { it.isNotBlank() }?.let { add(it) }
     }
 

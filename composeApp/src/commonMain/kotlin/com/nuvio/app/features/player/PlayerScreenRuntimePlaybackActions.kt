@@ -80,6 +80,37 @@ internal val PlayerScreenRuntime.playbackSession: WatchProgressPlaybackSession
         lastSourceUrl = activeSourceUrl,
     )
 
+internal fun PlayerScreenRuntime.currentLaunch(launch: PlayerLaunch): PlayerLaunch {
+    val positionMs = playbackSnapshot.positionMs.takeIf {
+        it > 0L && initialSeekApplied && playbackSnapshotKey == activePlaybackKey
+    }
+    return launch.copy(
+        sourceUrl = activeSourceUrl,
+        sourceAudioUrl = activeSourceAudioUrl,
+        sourceHeaders = activeSourceHeaders,
+        sourceResponseHeaders = activeSourceResponseHeaders,
+        externalSubtitles = externalSubtitles,
+        streamType = activeStreamType,
+        seasonNumber = activeSeasonNumber,
+        episodeNumber = activeEpisodeNumber,
+        episodeTitle = activeEpisodeTitle,
+        episodeThumbnail = activeEpisodeThumbnail,
+        streamTitle = activeStreamTitle,
+        streamSubtitle = activeStreamSubtitle,
+        bingeGroup = currentStreamBingeGroup,
+        pauseDescription = activePauseDescription,
+        providerName = activeProviderName,
+        providerAddonId = activeProviderAddonId,
+        videoId = activeVideoId,
+        torrentInfoHash = activeTorrentInfoHash,
+        torrentFileIdx = activeTorrentFileIdx,
+        torrentFilename = activeTorrentFilename,
+        torrentTrackers = activeTorrentTrackers,
+        initialPositionMs = positionMs ?: activeInitialPositionMs,
+        initialProgressFraction = activeInitialProgressFraction.takeIf { positionMs == null },
+    )
+}
+
 internal fun PlayerScreenRuntime.resetIdentityStateIfNeeded() {
     val identity = activePlaybackKey
     if (lastResetPlaybackIdentity != identity) {
