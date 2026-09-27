@@ -20,6 +20,16 @@
       "category": "entertainment",
       "versions": [
         {
+          "version": "0.5.3",
+          "buildVersion": "135",
+          "date": "2026-09-27T01:18:47Z",
+          "localizedDescription": "- 0b7ab892 feat(poster): support addon landscape posters @tapframe  \r\n- 60a0f4b3 feat(library): move downloads to library\r\n- 5ebb8ee5 feat(spinner): change indicator @tapframe  \r\n- [i18n(ur): add Urdu localization (#2067)](https://github.com/NuvioMedia/NuvioMobile/pull/2067) @muzii9  \r\n- 23b048c3 feat(player): add episode shuffle @tapframe  \r\n",
+          "downloadURL": "https://github.com/NuvioMedia/NuvioMobile/releases/download/0.5.3-beta/nuvio-0.5.3-full-release.ipa",
+          "size": 66299682,
+          "sha256": "7ee79b969d904893f3656ab99de0f9611fb9b70141c72f8094d4c04d74f4a72a",
+          "minOSVersion": "16.1"
+        },
+        {
           "version": "0.5.2",
           "buildVersion": "134",
           "date": "2026-09-25T18:03:57Z",
