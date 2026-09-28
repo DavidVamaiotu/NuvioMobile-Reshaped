@@ -1,3 +1,2 @@
-- **Live TV channels start like they do in other IPTV apps.** Xtream channels now use your provider's own panel link in the format your account allows, and channels whose picture only sends occasional keyframes start straight away instead of timing out.
-- **Seek previews match where you land.** Preview frames now show the exact moment they were taken from, and releasing your finger lands on the frame you saw. Hybrid previews also follow your Seekr offset.
-- **Seek buffer is now off by default.** Playback uses Nuvio's own buffering unless you pick a size in Settings > Nuvio Reshaped. When it is on, a failed link no longer keeps retrying on the error screen, and it never opens two connections to the same link.
+- **Smoother playback while AutoSync works.** The player no longer waits on AutoSync's background work, and AutoSync reuses its calculations instead of redoing them. Sync results are unchanged.
+- **Less wasted work for on-device previews.** When the preview spool is full, frames that would be thrown away are no longer copied.

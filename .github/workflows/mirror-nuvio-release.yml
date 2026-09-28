@@ -1,6 +1,6 @@
 name: AutoSync Release
 
-# Release trigger: Live TV links, seek preview sync, seek buffer fixes
+# Release trigger: AutoSync and preview performance fixes
 
 
 on:
