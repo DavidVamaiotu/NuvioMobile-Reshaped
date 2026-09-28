@@ -490,8 +490,6 @@ private data class XtreamLiveStream(
     val name: JsonElement? = null,
     @SerialName("stream_id") val streamId: JsonElement? = null,
     val id: JsonElement? = null,
-    @SerialName("direct_source") val directSource: JsonElement? = null,
-    @SerialName("container_extension") val containerExtension: JsonElement? = null,
     @SerialName("category_id") val categoryId: JsonElement? = null,
     @SerialName("epg_channel_id") val epgChannelId: JsonElement? = null,
     @SerialName("tvg_id") val tvgId: JsonElement? = null,
@@ -517,6 +515,7 @@ private object LiveTvRepositoryXtream {
         settings: LiveTvXtreamSettings,
         categories: Map<String, String>,
     ): List<LiveTvChannel> {
+        val extension = liveExtension(settings)
         val payload = request(settings, action = "get_live_streams")
         val streams = if (payload.trimStart().startsWith("[")) {
             stalkerJson.decodeFromString(ListSerializer(XtreamLiveStream.serializer()), payload)
@@ -528,13 +527,9 @@ private object LiveTvRepositoryXtream {
         return streams.mapIndexedNotNull { index, stream ->
             val name = stream.name.text() ?: return@mapIndexedNotNull null
             val streamId = stream.streamId.text() ?: stream.id.text() ?: return@mapIndexedNotNull null
-            val directSource = stream.directSource.text()
-                ?.takeIf { it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true) }
-            val extension = stream.containerExtension.text()
-                ?.trimStart('.')
-                ?.takeIf(String::isNotBlank)
-                ?: "ts"
-            val streamUrl = directSource ?: settings.liveStreamUrl(streamId, extension)
+            // Always the panel's own link, as IPTV players use: "direct_source" is often the
+            // panel's upstream origin, which refuses clients, and the panel redirects to it when it is meant to be used.
+            val streamUrl = settings.liveStreamUrl(streamId, extension)
             LiveTvChannel(
                 id = "xtream-$streamId-$index",
                 name = name,
@@ -547,11 +542,29 @@ private object LiveTvRepositoryXtream {
         }.distinctBy { it.streamUrl }
     }
 
-    private suspend fun request(settings: LiveTvXtreamSettings, action: String): String {
+    /**
+     * The live format this account may use: MPEG-TS, as IPTV players prefer, unless the account only
+     * allows HLS ("allowed_output_formats" in the login reply); a TS link then fails on every channel.
+     */
+    private suspend fun liveExtension(settings: LiveTvXtreamSettings): String {
+        val formats = try {
+            val login = stalkerJson.parseToJsonElement(request(settings, action = null)) as? JsonObject
+            (login?.get("user_info") as? JsonObject)?.get("allowed_output_formats")?.jsonArrayOrEmpty().orEmpty()
+                .mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.trim()?.lowercase() }
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            emptyList()
+        }
+        return if (formats.isEmpty() || "ts" in formats || "m3u8" !in formats) "ts" else "m3u8"
+    }
+
+    /** A player_api call; no [action] is the login call, which describes the account. */
+    private suspend fun request(settings: LiveTvXtreamSettings, action: String?): String {
         val parameters = buildMap {
             put("username", settings.username)
             put("password", settings.password)
-            put("action", action)
+            if (action != null) put("action", action)
         }
         val url = settings.playerApiEndpoint() + parameters.entries.joinToString(
             separator = "&",

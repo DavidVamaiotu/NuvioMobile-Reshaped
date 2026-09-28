@@ -301,7 +301,8 @@ private fun ExoPlayerSurface(
     val extractorsFactory = remember(sourceUrl, sourceAudioUrl) {
         val playbackExtractorsFactory = DefaultExtractorsFactory()
             .setTsExtractorFlags(
-                DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS,
+                DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS or
+                    com.nuvio.app.features.reshaped.livetv.LiveTvTsFlags.extraFor(sourceUrl), // Nuvio RS hook: Live TV starts on any I-frame
             )
             .setTsExtractorTimestampSearchBytes(1500 * TsExtractor.TS_PACKET_SIZE)
         AutoSyncExtractorsFactory( // AutoSync hook
