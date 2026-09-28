@@ -68,6 +68,9 @@ internal fun PlayerScreenRuntime.BindAutoSyncRuntimeEffects() {
         val videoId = activeVideoId ?: return@LaunchedEffect
         (playerController as? AutoSyncPlayerController)?.setAutoSyncContent(activeAddonSubtitleType, videoId)
     }
+    LaunchedEffect(playerController, isLoadingAddonSubtitles, addonSubtitles) {
+        retryPreferredSubtitleAfterAddonsLoaded()
+    }
     LaunchedEffect(playerController, externalSubtitles) {
         val controller = playerController ?: return@LaunchedEffect
         SubtitleRepository.addonSubtitles.collect { repositorySubtitles ->
@@ -79,6 +82,21 @@ internal fun PlayerScreenRuntime.BindAutoSyncRuntimeEffects() {
             )
         }
     }
+}
+
+/**
+ * Nuvio's automatic subtitle pick can finish before the addon subtitles arrive: with no built-in
+ * match it marks the pick done with nothing selected, and nothing runs it again until the
+ * subtitle menu is opened. Once the addon subtitles have loaded, run it one more time if nothing
+ * is selected and the user hasn't chosen anything themselves.
+ */
+private fun PlayerScreenRuntime.retryPreferredSubtitleAfterAddonsLoaded() {
+    if (playerController == null || playbackSnapshot.isLoading) return
+    if (isLoadingAddonSubtitles || addonSubtitles.isEmpty()) return
+    if (!preferredSubtitleSelectionApplied || isUserExplicitSubtitleSelection) return
+    if (selectedSubtitleIndex >= 0 || selectedAddonSubtitleId != null) return
+    preferredSubtitleSelectionApplied = false
+    refreshTracks()
 }
 
 /** The user picked an addon subtitle: start from its own timing and let AutoSync check it. */
