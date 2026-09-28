@@ -107,8 +107,8 @@ private fun ExtractorsFactory.withAssMkvSupportCompat(
     return ExtractorsFactory {
         val extractors = createExtractors()
         extractors.forEachIndexed { index, extractor ->
-            if (extractor is MatroskaExtractor) {
-                extractors[index] = AssMatroskaExtractor(subtitleParserFactory, assHandler)
+            if (extractor.underlyingImplementation is MatroskaExtractor) { // Nuvio RS: sees through fork extractor taps
+                extractors[index] = extractor.replaceInnermostExtractor(AssMatroskaExtractor(subtitleParserFactory, assHandler))
             }
         }
         extractors
