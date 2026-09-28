@@ -1,5 +1,6 @@
 package com.nuvio.app.features.player.seekpreview
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -19,5 +20,8 @@ internal actual fun createSeekrHttpClient(): HttpClient = HttpClient(OkHttp) {
 internal actual fun openLocalSeekPreviewTrack(cacheKey: String, durationMs: Long): SeekPreviewTrack? =
     com.nuvio.app.features.player.seekpreview.local.LocalPreviewSources.open(cacheKey, durationMs)
 
-internal actual fun decodeSeekrSpriteSheet(bytes: ByteArray): ImageBitmap? =
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+/** Sprite sheets are opaque JPEGs, so RGB_565 halves their memory at no visible cost. */
+internal actual fun decodeSeekrSpriteSheet(bytes: ByteArray): ImageBitmap? {
+    val options = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.RGB_565 }
+    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
+}

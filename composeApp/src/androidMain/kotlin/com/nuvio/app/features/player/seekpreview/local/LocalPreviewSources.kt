@@ -5,9 +5,13 @@ package com.nuvio.app.features.player.seekpreview.local
 import android.content.Context
 import androidx.media3.common.Format
 import androidx.media3.common.Player
+import androidx.media3.extractor.ChunkIndex
 import androidx.media3.extractor.ExtractorsFactory
+import androidx.media3.extractor.SeekMap
+import androidx.media3.extractor.mp4.Mp4Extractor
 import com.nuvio.app.features.player.seekpreview.SeekPreviewTrack
 import com.nuvio.app.features.reshaped.livetv.LiveTvPlaybackRegistry
+import kotlin.math.abs
 
 /** The stream an ExoPlayer is showing, as far as on-device previews need it. */
 internal class LocalPreviewSource(
@@ -40,6 +44,9 @@ internal class LocalPreviewSource(
  */
 internal object LocalPreviewSources {
     @Volatile private var current: LocalPreviewSource? = null
+
+    /** The index of the stream demuxed last, with the stream it belongs to. */
+    @Volatile private var keyframeIndex: Pair<String, SeekMap>? = null
 
     /** Call on the player's thread. */
     fun register(context: Context, sourceUrl: String, player: Player): LocalPreviewSource {
@@ -95,5 +102,28 @@ internal object LocalPreviewSources {
             override fun onKeyframe(format: Format, timeUs: Long, data: ByteArray, offset: Int, size: Int) {
                 track()?.onKeyframe(format, timeUs, data, offset, size)
             }
+
+            override fun onSeekMap(seekMap: SeekMap) {
+                // Only indexes that list real keyframes: an MP4's sync-sample table, or the
+                // cue points of an MKV (or a fragmented MP4's segment index). Estimated maps
+                // (constant bitrate, binary search) would point between keyframes.
+                if (seekMap is Mp4Extractor || seekMap is ChunkIndex) keyframeIndex = sourceKey to seekMap
+            }
         })
+
+    /**
+     * The keyframe of [sourceKey]'s stream nearest [positionMs] when one is within
+     * [toleranceMs], from the stream's own index; null without a usable index.
+     */
+    fun keyframeNear(sourceKey: String, positionMs: Long, toleranceMs: Long): Long? {
+        val (key, seekMap) = keyframeIndex ?: return null
+        if (key != sourceKey || positionMs < 0L) return null
+        return runCatching {
+            val points = seekMap.getSeekPoints(positionMs * 1_000L)
+            listOf(points.first.timeUs, points.second.timeUs)
+                .map { it / 1_000L }
+                .filter { it >= 0L && abs(it - positionMs) <= toleranceMs }
+                .minByOrNull { abs(it - positionMs) }
+        }.getOrNull()
+    }
 }

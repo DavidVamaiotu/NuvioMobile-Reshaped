@@ -61,8 +61,9 @@ internal fun PlayerScreenRuntime.WithSeekPreview(content: @Composable () -> Unit
 }
 
 /**
- * The position to show and seek to for a scrub at [positionMs]: the start of the cue whose
- * frame the preview shows, so preview and playback agree. Unchanged without a preview track.
+ * The position to seek to when a scrub is released at [positionMs]: the time of the frame the
+ * preview shows for it, so preview and playback agree. While scrubbing, the thumb and the time
+ * follow the finger; only the release lands on the frame. Unchanged without a preview track.
  */
 internal fun PlayerScreenRuntime.seekPreviewAligned(positionMs: Long): Long =
     seekPreview.alignedPosition(positionMs, playbackSnapshot.durationMs)
@@ -92,13 +93,6 @@ private fun PlayerScreenRuntime.BindSeekPreviewEffects() {
             episode = activeEpisodeNumber,
             durationMs = playbackSnapshot.durationMs,
         )
-    }
-    // Once the preview resolves a new cue, park an in-progress scrub on the frame it shows.
-    LaunchedEffect(seekPreview.previewCue) {
-        val pendingMs = scrubbingPositionMs
-        if (isScrubbingTimeline && pendingMs != null) {
-            scrubbingPositionMs = seekPreviewAligned(pendingMs)
-        }
     }
 }
 

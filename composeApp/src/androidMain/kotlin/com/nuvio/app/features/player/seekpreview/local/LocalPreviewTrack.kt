@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.media3.common.Format
 import androidx.media3.common.util.MediaFormatUtil
+import com.nuvio.app.features.player.seekpreview.SeekPreviewCue
 import com.nuvio.app.features.player.seekpreview.SeekPreviewTrack
 import com.nuvio.app.features.player.seekpreview.SeekrThumbnail
 import java.io.DataInputStream
@@ -95,6 +96,15 @@ internal class LocalPreviewTrack(
     /** A keyframe copied while playing, waiting in the spool to be decoded. */
     private class SpooledKeyframe(val format: Format, val timeUs: Long, val position: Long, val size: Int)
 
+    /** A keyframe waiting to see whether the next one is nearer its slot's time. */
+    private class Candidate(val slot: Int, val format: Format, val timeUs: Long, val bytes: ByteArray) {
+        val keyMs: Long get() = timeUs / 1_000L
+        val slotMs: Long get() = slot * SLOT_MS
+    }
+
+    /** The keyframe before its slot's time that is still in the running. Guarded by [lock]. */
+    private var candidate: Candidate? = null
+
     /** Slot → its spooled keyframe; the slot stays CLAIMED meanwhile. Guarded by [lock]. */
     private val spooled = HashMap<Int, SpooledKeyframe>()
     private val spoolFile = File(
@@ -131,6 +141,7 @@ internal class LocalPreviewTrack(
     override fun close() {
         if (closed) return
         closed = true
+        synchronized(lock) { candidate = null }
         tapExecutor.shutdownNow()
         Thread({
             runCatching { tapExecutor.awaitTermination(3, TimeUnit.SECONDS) }
@@ -151,18 +162,69 @@ internal class LocalPreviewTrack(
         focusSlot = slot
         lastLookupAtMs = SystemClock.elapsedRealtime()
         if (synchronized(lock) { spooled.isNotEmpty() }) scheduleDrain()
-        val found = synchronized(lock) { nearestFilled(slot) } ?: return null
+        val exact = synchronized(lock) { exactFrameFor(corrected) }
+        val found = exact ?: synchronized(lock) { nearestFilled(slot) } ?: return null
         val bitmap = bitmapFor(found) ?: return null
-        val cueStart = slot * SLOT_MS
-        val cueEnd = minOf(cueStart + SLOT_MS, durationMs).coerceAtLeast(cueStart + 1)
+        val cue = if (exact != null) synchronized(lock) { frameCue(exact) } else gridCue(slot)
         return SeekrThumbnail(
             sheet = bitmap,
             srcOffset = IntOffset.Zero,
             srcSize = IntSize(bitmap.width, bitmap.height),
-            cueStartMs = cueStart,
-            cueEndMs = cueEnd,
-            approximate = found != slot,
+            cueStartMs = cue.startMs,
+            cueEndMs = cue.endMs,
+            approximate = exact == null,
         )
+    }
+
+    override fun cueAt(positionMs: Long): SeekPreviewCue? {
+        val corrected = (positionMs + offsetMs).coerceIn(0L, (durationMs - 1).coerceAtLeast(0L))
+        val slot = (corrected / SLOT_MS).toInt().coerceIn(0, slotCount - 1)
+        return synchronized(lock) {
+            exactFrameFor(corrected)?.let(::frameCue) ?: nearestFilled(slot)?.let { gridCue(slot) }
+        }
+    }
+
+    override fun exactCueAt(positionMs: Long): SeekPreviewCue? {
+        val corrected = (positionMs + offsetMs).coerceIn(0L, (durationMs - 1).coerceAtLeast(0L))
+        return synchronized(lock) { exactFrameFor(corrected)?.let(::frameCue) }
+    }
+
+    override fun keyframeNear(positionMs: Long, toleranceMs: Long): Long? =
+        LocalPreviewSources.keyframeNear(source.sourceKey, positionMs, toleranceMs)
+
+    /**
+     * The filled slot whose frame is the latest at or before [positionMs], or null when that
+     * frame does not reach [positionMs] (see [frameCue]). Guarded by [lock].
+     *
+     * A frame is filed under the slot its keyframe is nearest to, so it lies within half a slot
+     * of the slot's time and frame times rise with the slot index: the latest one at or before
+     * [positionMs] is in the slot after [positionMs]'s own, that slot, or the one before.
+     */
+    private fun exactFrameFor(positionMs: Long): Int? {
+        val base = (positionMs / SLOT_MS).toInt()
+        for (slot in minOf(base + 1, slotCount - 1) downTo maxOf(base - 1, 0)) {
+            if (jpegs[slot] == null || frameMs[slot] > positionMs) continue
+            return slot.takeIf { positionMs < frameCue(it).endMs }
+        }
+        return null
+    }
+
+    /**
+     * The window a filled slot's frame stands for: from the keyframe's own time to the next
+     * slot's frame, or one slot long when the next slot has none. Cue starts are real frame
+     * times, so grid-locked scrubbing parks the seek on the very frame shown. Guarded by [lock].
+     */
+    private fun frameCue(slot: Int): SeekPreviewCue {
+        val startMs = frameMs[slot]
+        val next = slot + 1
+        val endMs = if (next < slotCount && jpegs[next] != null) frameMs[next] else startMs + SLOT_MS
+        return SeekPreviewCue(startMs, endMs.coerceAtLeast(startMs + 1))
+    }
+
+    /** A stand-in's window: its slot on the fixed grid, since its frame is from elsewhere. */
+    private fun gridCue(slot: Int): SeekPreviewCue {
+        val startMs = slot * SLOT_MS
+        return SeekPreviewCue(startMs, minOf(startMs + SLOT_MS, durationMs).coerceAtLeast(startMs + 1))
     }
 
     private fun nearestFilled(slot: Int): Int? {
@@ -195,21 +257,56 @@ internal class LocalPreviewTrack(
         if (closed) return false
         val keyMs = timeUs / 1_000L
         val slot = slotFor(keyMs) ?: return false
-        return synchronized(lock) { slotState[slot] == EMPTY && keyMs !in keyframeSlots }
+        return synchronized(lock) {
+            // Any keyframe settles a waiting candidate, so it is wanted while one waits.
+            candidate != null || (slotState[slot] == EMPTY && keyMs !in keyframeSlots)
+        }
     }
 
+    /**
+     * A keyframe playback downloaded. Each slot keeps the keyframe nearest its time rather than
+     * the first one that arrives: keyframes come in playback order, so one before the slot's
+     * time waits as the candidate until the next keyframe shows whether it is closer. One at or
+     * after the slot's time is final, since later ones only get farther. A candidate is never
+     * decoded before it is chosen, so this costs one copy of compressed bytes, not a decode.
+     */
     fun onKeyframe(format: Format, timeUs: Long, data: ByteArray, offset: Int, size: Int) {
         val keyMs = timeUs / 1_000L
         val slot = slotFor(keyMs) ?: return
+        val wanted = synchronized(lock) { slotState[slot] == EMPTY && keyMs !in keyframeSlots }
+        val incoming = if (wanted) Candidate(slot, format, timeUs, data.copyOfRange(offset, offset + size)) else null
+        val settled = ArrayList<Candidate>(2)
+        synchronized(lock) {
+            val waiting = candidate
+            candidate = null
+            var next = incoming
+            if (waiting != null) {
+                if (next == null || next.slot != waiting.slot) {
+                    settled += waiting
+                } else if (abs(waiting.keyMs - waiting.slotMs) < abs(next.keyMs - next.slotMs)) {
+                    // The new keyframe is past the slot's time and farther than the waiting one.
+                    settled += waiting
+                    next = null
+                }
+            }
+            if (next != null) {
+                if (next.keyMs >= next.slotMs) settled += next else candidate = next
+            }
+        }
+        for (chosen in settled) submit(chosen)
+    }
+
+    /** Decodes (or spools) a chosen keyframe into its slot. */
+    private fun submit(chosen: Candidate) {
         // Decoding runs behind playback's loader thread; when it falls behind, skip frames.
         if (tapExecutor.queue.remainingCapacity() == 0) return
+        val slot = chosen.slot
         if (!claim(slot)) return
-        val copy = data.copyOfRange(offset, offset + size)
         val submitted = runCatching {
             tapExecutor.execute {
                 if (mayDecodeNow()) {
-                    decodeInto(slot, format, copy, timeUs)
-                } else if (!spoolKeyframe(slot, format, timeUs, copy)) {
+                    decodeInto(slot, chosen.format, chosen.bytes, chosen.timeUs)
+                } else if (!spoolKeyframe(slot, chosen.format, chosen.timeUs, chosen.bytes)) {
                     release(slot)
                 }
                 if (mayDecodeNow()) scheduleDrain()
