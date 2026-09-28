@@ -1,0 +1,30 @@
+name: Rename releases (one-off)
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  rename:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Normalize release titles
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release list --limit 200 --json tagName,name -q '.[]|[.tagName,.name]|@tsv' | while IFS=$'\t' read -r tag name; do
+            new=""
+            if [[ $tag =~ ^(.+-beta)-audiosync\.([0-9]+)$ ]]; then
+              new="Nuvio Reshaped ${BASH_REMATCH[1]} audiosync (build ${BASH_REMATCH[2]})"
+            elif [[ $tag =~ ^(.+)-autosync-v([0-9]+)$ ]]; then
+              new="Nuvio Reshaped ${BASH_REMATCH[1]} (build ${BASH_REMATCH[2]})"
+            elif [[ $tag =~ ^(.+)-autosync\.([0-9]+)$ ]]; then
+              new="Nuvio Reshaped ${BASH_REMATCH[1]} (build ${BASH_REMATCH[2]})"
+            elif [[ $tag =~ ^(.+-beta)-autosync$ ]]; then
+              new="Nuvio Reshaped ${BASH_REMATCH[1]} (build 0)"
+            fi
+            if [ -n "$new" ] && [ "$new" != "$name" ]; then
+              echo "$tag: '$name' -> '$new'"
+              gh release edit "$tag" --title "$new"
+            fi
+          done
