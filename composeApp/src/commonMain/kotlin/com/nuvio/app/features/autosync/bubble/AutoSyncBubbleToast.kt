@@ -222,6 +222,7 @@ private fun AutoSyncBubble(message: AutoSyncBubbleMessage, modifier: Modifier) {
 
     val bounds = remember { BubbleWindowBounds() }
     val backdrop = AutoSyncBubbleBackdrop.sampler?.invoke(bounds, with(LocalDensity.current) { BackdropMargin.toPx() })
+    val backdropPainter = AutoSyncBubbleBackdrop.painter?.invoke()
     val backdropPath = remember { Path() }
     // About 16 copies a second while the words show; 5 once it has settled to just the droplet.
     SideEffect { bounds.sampleIntervalMs = if (labelVisible || cardOpen) 60L else 200L }
@@ -257,7 +258,29 @@ private fun AutoSyncBubble(message: AutoSyncBubbleMessage, modifier: Modifier) {
                 },
             ),
     ) {
-        if (backdrop != null) {
+        if (backdrop != null && backdropPainter != null) {
+            // The video behind, bent by the same kind of lens as the pill in one shader pass,
+            // clipped to the bubble's (flowing) outline.
+            Spacer(
+                Modifier
+                    .matchParentSize()
+                    .drawBehind {
+                        val frame = backdrop.value ?: return@drawBehind
+                        val rect = bounds.rect ?: return@drawBehind
+                        val corner = BubbleCorner.toPx().coerceAtMost(size.minDimension / 2f)
+                        buildLiquidOutline(
+                            path = backdropPath,
+                            width = size.width,
+                            height = size.height,
+                            corner = corner,
+                            amplitude = 0.6.dp.toPx() * (1f - settle.value),
+                            swell = 0.008f * sin(clock.floatValue * 2.1f) * (1f - settle.value),
+                            time = clock.floatValue,
+                        )
+                        clipPath(backdropPath) { with(backdropPainter) { paint(frame, rect, corner) } }
+                    },
+            )
+        } else if (backdrop != null) {
             // The video behind, softly blurred and bent at the edges like thick glass, clipped
             // to the bubble's (flowing) outline.
             Box(
