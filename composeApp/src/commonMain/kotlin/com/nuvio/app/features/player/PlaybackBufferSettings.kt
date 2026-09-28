@@ -14,7 +14,8 @@ internal object PlaybackBufferSettings {
     /** 0 keeps Nuvio's own buffer sizes. */
     const val NUVIO_DEFAULT_MB = 0
     val optionsMb = listOf(NUVIO_DEFAULT_MB, 256, 512, 1024)
-    private const val DEFAULT_MB = 512
+    // Off unless the user picks a size: the read-ahead writes to storage at full speed.
+    private const val DEFAULT_MB = NUVIO_DEFAULT_MB
 
     private val _bufferMb = MutableStateFlow(DEFAULT_MB)
     val bufferMb: StateFlow<Int> = _bufferMb.asStateFlow()
