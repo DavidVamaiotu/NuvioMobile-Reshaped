@@ -1,6 +1,6 @@
 name: AutoSync Release
 
-# Release trigger: AutoSync dense dialogue offset fix
+# Release trigger: Live TV links, seek preview sync, seek buffer fixes
 
 
 on:

@@ -1,1 +1,3 @@
-- **AutoSync keeps in-sync subtitles in sync.** On episodes with dense, back-to-back dialogue, AutoSync could move a subtitle that already matched by up to 1.5 seconds. It now checks where the lines actually start, so it picks the exact offset.
+- **Live TV channels start like they do in other IPTV apps.** Xtream channels now use your provider's own panel link in the format your account allows, and channels whose picture only sends occasional keyframes start straight away instead of timing out.
+- **Seek previews match where you land.** Preview frames now show the exact moment they were taken from, and releasing your finger lands on the frame you saw. Hybrid previews also follow your Seekr offset.
+- **Seek buffer is now off by default.** Playback uses Nuvio's own buffering unless you pick a size in Settings > Nuvio Reshaped. When it is on, a failed link no longer keeps retrying on the error screen, and it never opens two connections to the same link.
