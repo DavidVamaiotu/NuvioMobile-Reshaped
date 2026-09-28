@@ -1,6 +1,7 @@
 name: Rename releases (one-off)
 on:
-  workflow_dispatch:
+  push:
+    branches: [claude/project-thread-c02mzx]
 permissions:
   contents: write
 jobs:
