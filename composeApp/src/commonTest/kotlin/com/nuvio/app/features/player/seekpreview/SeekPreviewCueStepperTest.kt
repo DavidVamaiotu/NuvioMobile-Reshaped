@@ -235,4 +235,15 @@ class SeekPreviewCueStepperTest {
         }
         assertEquals(28_000L, position)
     }
+
+    @Test
+    fun `alignment lands on a nearby keyframe and then stays put`() {
+        val cue = SeekPreviewCue(600_000L, 610_000L)
+        val keyframe = 598_800L
+        val snap = { startMs: Long -> if (kotlin.math.abs(startMs - keyframe) <= 1_500L) keyframe else startMs }
+
+        assertEquals(keyframe, SeekPreviewCueStepper.alignedTargetMs(cue, 603_000L, 7_200_000L, snap))
+        // The snapped position is still represented by the same cue, so it settles.
+        assertNull(SeekPreviewCueStepper.alignedTargetMs(cue, keyframe, 7_200_000L, snap))
+    }
 }

@@ -4,9 +4,14 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import kotlin.concurrent.Volatile
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -89,6 +94,11 @@ internal class SeekrTrack(
         )
     }
 
+    override fun cueAt(positionMs: Long): SeekPreviewCue? =
+        resolveCue(positionMs)?.let { SeekPreviewCue(it.startMs, it.endMs) }
+
+    override fun close() = sheets.close()
+
     /**
      * The last cue whose start is at or before [positionMs] + [offsetMs]. Positions before the
      * first cue or past the last clamp to the first or last cue, so the offset alone never
@@ -117,16 +127,22 @@ internal class SeekrTrack(
  * Sprite sheets keyed by URL. Every sheet's encoded bytes are kept for the session so
  * scrubbing never re-downloads, while only the most recently used [maxDecodedSheets] are held
  * decoded — a film's worth of full-size decoded sheets is too much memory for a phone.
- * Per-URL locks let different sheets download in parallel.
+ *
+ * A sheet is downloaded and decoded in this cache's own scope, not the caller's: the preview
+ * cancels its lookup whenever the scrub moves on, and a decode thrown away half-way would be
+ * started again by the next lookup, so a fast drag could keep the old frame on screen until the
+ * finger slowed down. One load per URL runs at a time; different sheets load in parallel.
  */
 internal class SeekrSheetCache(
     private val download: suspend (String) -> ByteArray?,
     private val decode: (ByteArray) -> ImageBitmap? = ::decodeSeekrSpriteSheet,
-    private val maxDecodedSheets: Int = 4,
+    private val maxDecodedSheets: Int = 8,
 ) {
     private val guard = Mutex()
-    private val locks = mutableMapOf<String, Mutex>()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val encoded = mutableMapOf<String, ByteArray>()
+    private val downloads = mutableMapOf<String, Deferred<ByteArray?>>()
+    private val decodes = mutableMapOf<String, Deferred<ImageBitmap?>>()
     private val decoded = LinkedHashMap<String, ImageBitmap>()
 
     suspend fun prefetch(url: String) {
@@ -134,29 +150,47 @@ internal class SeekrSheetCache(
     }
 
     suspend fun get(url: String): ImageBitmap? {
-        guard.withLock { decoded.remove(url)?.also { decoded[url] = it } }?.let { return it }
-        return lockFor(url).withLock {
-            guard.withLock { decoded[url] }?.let { return@withLock it }
-            val bytes = bytesFor(url) ?: return@withLock null
-            val bitmap = withContext(Dispatchers.Default) { runCatching { decode(bytes) }.getOrNull() }
-                ?: return@withLock null
-            guard.withLock {
+        val load = guard.withLock {
+            decoded.remove(url)?.let { bitmap ->
                 decoded[url] = bitmap
-                while (decoded.size > maxDecodedSheets) decoded.remove(decoded.keys.first())
+                return bitmap
             }
-            bitmap
+            decodes.getOrPut(url) {
+                scope.async {
+                    try {
+                        val bytes = bytesFor(url) ?: return@async null
+                        val bitmap = runCatching { decode(bytes) }.getOrNull() ?: return@async null
+                        guard.withLock {
+                            decoded[url] = bitmap
+                            while (decoded.size > maxDecodedSheets) decoded.remove(decoded.keys.first())
+                        }
+                        bitmap
+                    } finally {
+                        withContext(NonCancellable) { guard.withLock { decodes.remove(url) } }
+                    }
+                }
+            }
         }
+        return load.await()
     }
 
     private suspend fun bytesFor(url: String): ByteArray? {
-        guard.withLock { encoded[url] }?.let { return it }
-        return lockFor("bytes:$url").withLock {
-            guard.withLock { encoded[url] }?.let { return@withLock it }
-            val bytes = download(url) ?: return@withLock null
-            guard.withLock { encoded[url] = bytes }
-            bytes
+        val load = guard.withLock {
+            encoded[url]?.let { return it }
+            downloads.getOrPut(url) {
+                scope.async {
+                    try {
+                        download(url)?.also { bytes -> guard.withLock { encoded[url] = bytes } }
+                    } finally {
+                        withContext(NonCancellable) { guard.withLock { downloads.remove(url) } }
+                    }
+                }
+            }
         }
+        return load.await()
     }
 
-    private suspend fun lockFor(key: String): Mutex = guard.withLock { locks.getOrPut(key) { Mutex() } }
+    fun close() {
+        scope.cancel()
+    }
 }

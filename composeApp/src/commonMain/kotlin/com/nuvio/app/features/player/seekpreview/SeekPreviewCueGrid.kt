@@ -135,18 +135,35 @@ internal object SeekPreviewCueStepper {
      * would drag the pending position out of the seekable range, or pull it a full cue back
      * from an end the user had just reached — making 0 and [durationMs] unreachable and
      * leaving the committed seek disagreeing with the time on screen.
+     *
+     * [snap] may move the cue's start onto a nearby keyframe of the playing file (see
+     * [SEEK_PREVIEW_KEYFRAME_SNAP_MS]); it must stay well inside half a cue, so the snapped
+     * position is still represented by the same cue and the alignment stays settled.
      */
-    fun alignedTargetMs(cue: SeekPreviewCue?, pendingMs: Long?, durationMs: Long): Long? {
+    fun alignedTargetMs(
+        cue: SeekPreviewCue?,
+        pendingMs: Long?,
+        durationMs: Long,
+        snap: (Long) -> Long = { it },
+    ): Long? {
         if (cue == null || !cue.isValid || pendingMs == null) return null
         if (!cue.represents(pendingMs)) return null
         // The ends of the media are destinations in their own right.
         if (pendingMs <= 0L) return null
         if (durationMs > 0L && pendingMs >= durationMs) return null
 
-        val target = cue.startMs
+        val target = snap(cue.startMs)
         if (target < 0L) return null
         if (durationMs > 0L && target > durationMs) return null
         if (target == pendingMs) return null
         return target
     }
 }
+
+/**
+ * How far a scrub target may move to land on a keyframe of the playing file. A keyframe is the
+ * one position a player can seek to exactly without decoding forward, so this makes the seek
+ * both precise and as fast as it gets. Seekr frames are themselves only within about 3 s of
+ * their cue time, so moving by up to this much costs nothing visible.
+ */
+internal const val SEEK_PREVIEW_KEYFRAME_SNAP_MS = 1_500L

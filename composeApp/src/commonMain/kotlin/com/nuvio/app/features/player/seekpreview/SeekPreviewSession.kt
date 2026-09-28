@@ -116,18 +116,39 @@ internal class SeekPreviewSession {
     }
 
     /**
-     * Grid-locked scrubbing for touch: the position to show and seek to for a scrub at
-     * [positionMs] — the start of the cue whose frame the preview is showing, so the preview
-     * and the frame playback lands on always agree. Unchanged when no track is loaded or no
-     * cue describes the position yet (see [SeekPreviewCueStepper.alignedTargetMs]).
+     * Where a touch scrub released at [positionMs] should seek: the time of the frame the
+     * preview shows for it (moved onto the file's keyframe when one is within
+     * [SEEK_PREVIEW_KEYFRAME_SNAP_MS]), so the preview and the frame playback lands on agree.
+     * Unchanged when no track is loaded or no frame describes the position (see
+     * [SeekPreviewCueStepper.alignedTargetMs]).
      */
     fun alignedPosition(positionMs: Long, durationMs: Long): Long {
-        if (track == null) return positionMs
+        val activeTrack = track ?: return positionMs
+        // The frame on screen when it describes this position; otherwise its lookup has not
+        // caught up with the finger yet, so resolve the frame it is about to show.
+        val cue = previewCue?.takeIf { it.represents(positionMs) } ?: centreCueFor(activeTrack, positionMs)
         return SeekPreviewCueStepper.alignedTargetMs(
-            cue = previewCue,
+            cue = cue,
             pendingMs = positionMs,
             durationMs = if (durationMs > 0L) durationMs else Long.MAX_VALUE,
+            snap = { startMs -> activeTrack.keyframeNear(startMs, SEEK_PREVIEW_KEYFRAME_SNAP_MS) ?: startMs },
         ) ?: positionMs
+    }
+
+    /**
+     * The cue (playback timebase) of the frame the preview centres on for [positionMs], the same
+     * choice [SeekPreviewThumbnailStrip] makes, but without loading any frame.
+     */
+    private fun centreCueFor(activeTrack: SeekPreviewTrack, positionMs: Long): SeekPreviewCue? {
+        val offset = offsetMs.toLong()
+        activeTrack.offsetMs = offset
+        val covering = activeTrack.cueAt(positionMs)
+            ?.let { SeekPreviewCue(it.startMs - offset, it.endMs - offset) } ?: return null
+        if (!covering.prefersSuccessorFor(positionMs)) return covering
+        return activeTrack.cueAt(covering.endMs)
+            ?.let { SeekPreviewCue(it.startMs - offset, it.endMs - offset) }
+            ?.takeIf { it.startMs != covering.startMs }
+            ?: covering
     }
 }
 

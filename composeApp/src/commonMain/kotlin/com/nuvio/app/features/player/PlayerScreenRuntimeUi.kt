@@ -372,7 +372,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
             onParentalGuideAnimationComplete = { showParentalGuide = false },
             onScrubChange = { positionMs ->
                 isScrubbingTimeline = true
-                scrubbingPositionMs = seekPreviewAligned(positionMs)
+                scrubbingPositionMs = positionMs
             },
             onScrubFinished = { rawPositionMs ->
                 val positionMs = seekPreviewAligned(rawPositionMs)

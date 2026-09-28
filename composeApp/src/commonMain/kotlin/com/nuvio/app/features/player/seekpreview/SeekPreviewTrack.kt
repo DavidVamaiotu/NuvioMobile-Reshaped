@@ -20,6 +20,22 @@ internal interface SeekPreviewTrack {
     /** The thumbnail covering [positionMs] (after [offsetMs]) with its cue window, or null. */
     suspend fun thumbnailFor(positionMs: Long): SeekrThumbnail?
 
+    /**
+     * The cue window (preview timeline) of the frame [thumbnailFor] would return for
+     * [positionMs], without loading the frame, or null when there is none.
+     */
+    fun cueAt(positionMs: Long): SeekPreviewCue?
+
+    /** Like [cueAt], but only for a frame that really shows [positionMs], not a stand-in. */
+    fun exactCueAt(positionMs: Long): SeekPreviewCue? = cueAt(positionMs)
+
+    /**
+     * The playing file's keyframe nearest [positionMs] (playback timeline) when one is within
+     * [toleranceMs], read from the file's own index; null when unknown. Seeking onto a keyframe
+     * is both exact and the fastest seek a player can make.
+     */
+    fun keyframeNear(positionMs: Long, toleranceMs: Long): Long? = null
+
     /** Downloads or loads what the track needs ahead of the first lookup. */
     suspend fun prefetch() = Unit
 

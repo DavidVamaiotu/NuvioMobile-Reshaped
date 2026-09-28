@@ -27,6 +27,9 @@ internal interface KeyframeSink {
 
     /** Whether a keyframe at [timeUs] would fill a missing thumbnail. */
     fun wantsKeyframe(timeUs: Long): Boolean
+
+    /** The stream's seek map, once its index has been read. */
+    fun onSeekMap(seekMap: SeekMap) = Unit
 }
 
 /**
@@ -80,7 +83,10 @@ private class VideoTapExtractorOutput(
 
     override fun endTracks() = delegate.endTracks()
 
-    override fun seekMap(seekMap: SeekMap) = delegate.seekMap(seekMap)
+    override fun seekMap(seekMap: SeekMap) {
+        runCatching { sink.onSeekMap(seekMap) }
+        delegate.seekMap(seekMap)
+    }
 }
 
 /**
