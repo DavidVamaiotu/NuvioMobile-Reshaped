@@ -53,6 +53,17 @@ internal class Fft(val size: Int) {
     }
 
     companion object {
+        private const val CACHED_SIZES = 4
+
+        // The tables never change, so transforms of one size share them instead of rebuilding
+        // 1.5 MB of them on every alignment pass (every few seconds while searching).
+        private val cache = object : LinkedHashMap<Int, Fft>(8, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, Fft>?) = size > CACHED_SIZES
+        }
+
+        /** A shared instance for [size]; [transform] only reads the tables, so it is thread-safe. */
+        fun of(size: Int): Fft = synchronized(cache) { cache.getOrPut(size) { Fft(size) } }
+
         fun sizeFor(minimum: Int): Int {
             var n = 2
             while (n < minimum) n = n shl 1

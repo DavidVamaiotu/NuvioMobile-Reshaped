@@ -9,8 +9,14 @@ package com.nuvio.app.features.player.audiosync
  * the aligner takes snapshots.
  */
 internal class SpeechTimeline {
-    private var values = ByteArray(INITIAL_CAPACITY)
-    private var knownFrames = 0
+    // Written under the lock; read without it on the hot paths (the player's playback and loader
+    // threads ask per buffer whether a stretch is still unknown). A stale answer there only
+    // decides whether a buffer gets analysed, so it is harmless, while waiting on a lock held by a
+    // background-priority thread would delay video frames.
+    @Volatile private var values = ByteArray(INITIAL_CAPACITY)
+    @Volatile private var knownFrames = 0
+    /** One past the highest frame ever recorded, so scans stop there rather than at capacity. */
+    @Volatile private var knownEnd = 0
 
     @Volatile
     var version: Long = 0L
@@ -21,8 +27,10 @@ internal class SpeechTimeline {
         if (frame < 0 || frame >= MAX_FRAMES) return
         ensureCapacity(frame + 1)
         val quantized = 1 + (kotlin.math.sqrt(probability.coerceIn(0f, 1f)) * 254f + 0.5f).toInt()
-        if (values[frame].toInt() == 0) knownFrames++
-        values[frame] = quantized.toByte()
+        val current = values
+        if (current[frame].toInt() == 0) knownFrames++
+        current[frame] = quantized.toByte()
+        if (frame >= knownEnd) knownEnd = frame + 1
         version++
     }
 
@@ -30,42 +38,42 @@ internal class SpeechTimeline {
     fun clear() {
         values.fill(0)
         knownFrames = 0
+        knownEnd = 0
         version++
     }
 
-    @Synchronized
     fun knownFrameCount(): Int = knownFrames
 
     /** Returns probabilities for [fromFrame, toFrame); unknown frames are NaN. */
-    @Synchronized
     fun snapshot(fromFrame: Int, toFrame: Int): FloatArray {
         val out = FloatArray((toFrame - fromFrame).coerceAtLeast(0)) { Float.NaN }
         val start = fromFrame.coerceAtLeast(0)
-        val end = toFrame.coerceAtMost(values.size)
-        for (frame in start until end) {
-            val raw = values[frame].toInt() and 0xFF
-            if (raw != 0) {
-                val root = (raw - 1) / 254f
-                out[frame - fromFrame] = root * root
+        val raw = copyRange(start, toFrame)
+        for (index in raw.indices) {
+            val value = raw[index].toInt() and 0xFF
+            if (value != 0) {
+                val root = (value - 1) / 254f
+                out[start + index - fromFrame] = root * root
             }
         }
         return out
     }
 
     /** First and last known frame (inclusive), or null when nothing was analysed yet. */
-    @Synchronized
     fun knownRange(): IntRange? {
         if (knownFrames == 0) return null
+        val raw = copyRange(0, Int.MAX_VALUE)
         var first = -1
-        for (i in values.indices) {
-            if (values[i].toInt() != 0) {
+        for (i in raw.indices) {
+            if (raw[i].toInt() != 0) {
                 first = i
                 break
             }
         }
+        if (first < 0) return null
         var last = first
-        for (i in values.indices.reversed()) {
-            if (values[i].toInt() != 0) {
+        for (i in raw.indices.reversed()) {
+            if (raw[i].toInt() != 0) {
                 last = i
                 break
             }
@@ -73,13 +81,25 @@ internal class SpeechTimeline {
         return first..last
     }
 
-    @Synchronized
+    /** Lock-free (see [values]): may miss frames being recorded concurrently. */
     fun knownFramesIn(fromFrame: Int, toFrame: Int): Int {
+        val current = values
         var count = 0
-        for (frame in fromFrame.coerceAtLeast(0) until toFrame.coerceAtMost(values.size)) {
-            if (values[frame].toInt() != 0) count++
+        for (frame in fromFrame.coerceAtLeast(0) until toFrame.coerceAtMost(minOf(current.size, knownEnd))) {
+            if (current[frame].toInt() != 0) count++
         }
         return count
+    }
+
+    /**
+     * A copy of the raw values for [fromFrame, toFrame), clipped to what was ever recorded. Only
+     * the copy happens under the lock; callers scan and convert outside it.
+     */
+    @Synchronized
+    private fun copyRange(fromFrame: Int, toFrame: Int): ByteArray {
+        val start = fromFrame.coerceAtLeast(0)
+        val end = toFrame.coerceAtMost(minOf(values.size, knownEnd))
+        return if (end <= start) EMPTY else values.copyOfRange(start, end)
     }
 
     /**
@@ -88,7 +108,6 @@ internal class SpeechTimeline {
      * are returned, keeping the latest stretches. Scattered samples of a film stay cheap to align
      * this way, where one array spanning all of them would not.
      */
-    @Synchronized
     fun segments(
         fromFrame: Int = 0,
         toFrame: Int = Int.MAX_VALUE,
@@ -97,12 +116,14 @@ internal class SpeechTimeline {
     ): List<SpeechSegment> {
         if (knownFrames == 0) return emptyList()
         val start = fromFrame.coerceAtLeast(0)
-        val end = toFrame.coerceAtMost(values.size)
+        // One consistent copy, then everything below runs without the lock.
+        val raw = copyRange(start, toFrame)
         val runs = ArrayList<IntRange>()
         var runStart = -1
         var lastKnown = -1
-        for (frame in start until end) {
-            if (values[frame].toInt() == 0) continue
+        for (index in raw.indices) {
+            if (raw[index].toInt() == 0) continue
+            val frame = start + index
             if (runStart >= 0 && frame - lastKnown - 1 >= joinGapFrames) {
                 runs += runStart..lastKnown
                 runStart = -1
@@ -116,7 +137,7 @@ internal class SpeechTimeline {
         for (run in runs.asReversed()) {
             if (budget <= 0) break
             val first = maxOf(run.first, run.last + 1 - budget)
-            kept += SpeechSegment(first, snapshot(first, run.last + 1))
+            kept += SpeechSegment(first, probabilities(raw, first - start, run.last + 1 - start))
             budget -= run.last + 1 - first
         }
         kept.reverse()
@@ -124,16 +145,33 @@ internal class SpeechTimeline {
     }
 
     private fun ensureCapacity(required: Int) {
-        if (required <= values.size) return
-        var size = values.size
+        val current = values
+        if (required <= current.size) return
+        var size = current.size
         while (size < required) size *= 2
-        values = values.copyOf(size.coerceAtMost(MAX_FRAMES))
+        values = current.copyOf(size.coerceAtMost(MAX_FRAMES))
+    }
+
+    /** Probabilities of raw[from until to]; unknown frames are NaN. */
+    private fun probabilities(raw: ByteArray, from: Int, to: Int): FloatArray {
+        val out = FloatArray(to - from)
+        for (index in out.indices) {
+            val value = raw[from + index].toInt() and 0xFF
+            out[index] = if (value == 0) {
+                Float.NaN
+            } else {
+                val root = (value - 1) / 254f
+                root * root
+            }
+        }
+        return out
     }
 
     companion object {
         const val FRAME_DURATION_US = SileroVad.CHUNK_DURATION_US
         const val FRAME_DURATION_MS = FRAME_DURATION_US / 1_000.0
         private const val INITIAL_CAPACITY = 1 shl 15
+        private val EMPTY = ByteArray(0)
 
         /** Two minutes: shorter gaps cost less to carry than a separate transform. */
         val DEFAULT_JOIN_GAP_FRAMES = (120_000 / FRAME_DURATION_MS).toInt()

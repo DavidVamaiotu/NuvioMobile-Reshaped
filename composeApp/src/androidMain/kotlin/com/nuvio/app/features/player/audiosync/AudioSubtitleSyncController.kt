@@ -348,7 +348,7 @@ internal class AudioSubtitleSyncController(
                 (notice?.let { " notice=$it" } ?: "") + (problem?.let { " problem=$it" } ?: "")
         }
         // Word count and look-ahead change constantly; log them only alongside a real change.
-        val key = state.replace(Regex(" ahead=\\d+s words=\\d+"), "")
+        val key = state.replace(changingPanelFields, "")
         if (key == lastLoggedState) return
         lastLoggedState = key
         val offset = diagnostics.offsetMs?.let { " offset=%+.1fs".format(java.util.Locale.US, it / 1_000.0) }.orEmpty()
@@ -1234,6 +1234,7 @@ internal class AudioSubtitleSyncController(
         }
 
         private val periodPrefix = Regex("^(\\d+:)+")
+        private val changingPanelFields = Regex(" ahead=\\d+s words=\\d+")
 
         /**
          * Same audio track, tolerating the Format differences between the extractor output and the

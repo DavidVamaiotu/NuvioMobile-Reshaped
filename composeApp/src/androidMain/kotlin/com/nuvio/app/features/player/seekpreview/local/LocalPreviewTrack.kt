@@ -115,6 +115,11 @@ internal class LocalPreviewTrack(
     private var spool: RandomAccessFile? = null
     private var spoolEnd = 0L
     private var spoolLimit = SPOOL_LIMIT_BYTES
+    /**
+     * The spool had no room for the last keyframe. While keyframes could only be spooled, copying
+     * the stream's video for ones that would be dropped is skipped until the spool drains.
+     */
+    @Volatile private var spoolFull = false
     private val drainScheduled = AtomicBoolean(false)
     /** Slot the viewer last scrubbed to, so its keyframes are decoded first. */
     @Volatile private var focusSlot = -1
@@ -251,7 +256,8 @@ internal class LocalPreviewTrack(
 
     // ---- Buffer tap ----------------------------------------------------------------------
 
-    fun wantsKeyframes(): Boolean = !closed && synchronized(lock) { filledCount < slotCount }
+    fun wantsKeyframes(): Boolean =
+        !closed && !(spoolFull && !mayDecodeNow()) && synchronized(lock) { filledCount < slotCount }
 
     fun wantsKeyframe(timeUs: Long): Boolean {
         if (closed) return false
@@ -335,7 +341,10 @@ internal class LocalPreviewTrack(
 
     /** Keeps [bytes] compressed until it may be decoded; false when the spool is full or unwritable. */
     private fun spoolKeyframe(slot: Int, format: Format, timeUs: Long, bytes: ByteArray): Boolean {
-        if (spoolEnd + bytes.size > spoolLimit) return false
+        if (spoolEnd + bytes.size > spoolLimit) {
+            spoolFull = true
+            return false
+        }
         return runCatching {
             val file = spool ?: run {
                 val dir = spoolFile.parentFile
@@ -343,7 +352,10 @@ internal class LocalPreviewTrack(
                 // Never take more than a quarter of the free storage.
                 val free = runCatching { dir?.usableSpace ?: 0L }.getOrDefault(0L)
                 spoolLimit = minOf(SPOOL_LIMIT_BYTES, free / 4)
-                if (spoolEnd + bytes.size > spoolLimit) return false
+                if (spoolEnd + bytes.size > spoolLimit) {
+                    spoolFull = true
+                    return false
+                }
                 RandomAccessFile(spoolFile, "rw").also { it.setLength(0L); spool = it }
             }
             file.seek(spoolEnd)
@@ -374,6 +386,7 @@ internal class LocalPreviewTrack(
                 spoolEnd = 0L
                 runCatching { spool?.setLength(0L) }
             }
+            spoolFull = false
             return
         }
         val (slot, entry) = next

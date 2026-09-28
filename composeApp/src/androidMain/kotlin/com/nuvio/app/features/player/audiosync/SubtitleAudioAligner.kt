@@ -136,7 +136,7 @@ internal object SubtitleAudioAligner {
                 known++
             }
             if (known == 0) continue
-            val fft = Fft(size)
+            val fft = Fft.of(size)
             fft.transform(audioRe, audioIm)
             parts += Part(fft, audioRe, audioIm, n, segment.fromFrame, gLength, fullyKnown = known == n)
         }
