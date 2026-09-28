@@ -17,10 +17,11 @@ internal object PlaybackBufferAndroid {
     private const val BUFFER_MB_KEY = "playback_buffer_mb"
     private const val MB = 1024L * 1024L
 
-    // Nuvio's own values. The back buffer stays at Nuvio's 30 s: it shares ExoPlayer's byte
-    // budget, so a longer one could crowd out the data ahead of playback.
-    private const val EXO_BACK_BUFFER_MS = 30_000
-    private const val NUVIO_EXO_MAX_BUFFER_MS = 70_000
+    // Nuvio's own values (0.5.4 lowered them to 10 s back, 50 s ahead). The back buffer stays at
+    // Nuvio's value: it shares ExoPlayer's byte budget, so a longer one could crowd out the data
+    // ahead of playback.
+    private const val EXO_BACK_BUFFER_MS = 10_000
+    private const val NUVIO_EXO_MAX_BUFFER_MS = 50_000
 
     // With a byte budget the size limit decides how far ahead to read, not the clock.
     private const val EXO_MAX_BUFFER_MS = 30 * 60_000
