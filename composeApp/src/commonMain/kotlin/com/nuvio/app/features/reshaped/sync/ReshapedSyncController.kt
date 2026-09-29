@@ -27,7 +27,7 @@ sealed interface ReshapedSignInState {
 
 /**
  * Sync of Reshaped settings and Live TV through the viewer's Google account (one file in the
- * account's hidden Drive app folder; the TV app writes the same file). Android only: the
+ * account's Google Drive; the TV app writes the same file). Android only: the
  * settings section shows only where [ReshapedSyncBridge.controller] is installed.
  */
 interface ReshapedSyncController {

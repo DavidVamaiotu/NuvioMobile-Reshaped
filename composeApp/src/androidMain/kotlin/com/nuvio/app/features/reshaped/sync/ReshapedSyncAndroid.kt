@@ -44,7 +44,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 
 /**
- * The phone side of Reshaped sync: the same file in the Google account's hidden Drive app folder
+ * The phone side of Reshaped sync: the same file in the viewer's Google Drive
  * as the TV app, merged key by key (see [SyncDoc]). The phone has one Live TV source, so it
  * keeps the TV's other sources in the file as they are and never deletes them.
  *

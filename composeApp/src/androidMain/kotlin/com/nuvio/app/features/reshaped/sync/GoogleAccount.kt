@@ -29,14 +29,16 @@ internal data class GoogleDeviceCode(
 
 /**
  * The Google account Reshaped syncs to, signed in with Google's sign-in for TVs, the same
- * client as the TV app (a code approved in the browser, no Play Services needed). Only the Drive app folder scope is asked for: the app
- * sees its own hidden folder, never the viewer's files.
+ * client as the TV app (a code approved in the browser, no Play Services needed). Only Drive access to the app's own files is asked for: the app
+ * sees only the file it made, never the viewer's other files.
  */
 internal object GoogleAccount {
     private const val PREFS = "nuvio_reshaped_sync_account"
     private const val KEY_REFRESH = "refresh_token"
     private const val KEY_EMAIL = "email"
-    private const val DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata"
+    // Google's TV sign-in allows only a few scopes: drive.file (files this app made), not the
+    // hidden app folder (drive.appdata is refused with invalid_scope).
+    private const val DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file"
     private const val SCOPES = "openid email $DRIVE_SCOPE"
     private const val DEVICE_CODE_URL = "https://oauth2.googleapis.com/device/code"
     private const val TOKEN_URL = "https://oauth2.googleapis.com/token"
