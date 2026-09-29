@@ -1,6 +1,6 @@
 name: AutoSync Release
 
-# Release trigger: Nuvio 0.5.4-beta sync, AutoSync and preview performance fixes
+# Release trigger: rebuild with Google sign-in keys for Reshaped sync
 
 
 on:
