@@ -299,6 +299,19 @@ jobs:
             echo "IMDB_TAPFRAME_API_BASE_URL=https://imdb.tapframe.space/"
           } > local.properties
 
+      - name: Add Google sign-in for Reshaped sync
+        if: steps.version.outputs.already_exists == 'false'
+        env:
+          RESHAPED_GOOGLE_TV_CLIENT_ID: ${{ secrets.RESHAPED_GOOGLE_TV_CLIENT_ID }}
+          RESHAPED_GOOGLE_TV_CLIENT_SECRET: ${{ secrets.RESHAPED_GOOGLE_TV_CLIENT_SECRET }}
+        run: |
+          # "Sync with Google" shows as not set up in builds without both secrets.
+          if [[ -n "$RESHAPED_GOOGLE_TV_CLIENT_ID" && -n "$RESHAPED_GOOGLE_TV_CLIENT_SECRET" ]]; then
+            printf '\nRESHAPED_GOOGLE_TV_CLIENT_ID=%s\nRESHAPED_GOOGLE_TV_CLIENT_SECRET=%s\n' "$RESHAPED_GOOGLE_TV_CLIENT_ID" "$RESHAPED_GOOGLE_TV_CLIENT_SECRET" >> local.properties
+          else
+            echo "::warning::RESHAPED_GOOGLE_TV_CLIENT_ID/SECRET secrets are not set; Google sync is unavailable in this build"
+          fi
+
       - name: Add Seekr API key
         if: steps.version.outputs.already_exists == 'false'
         env:

@@ -369,6 +369,81 @@ object LiveTvRepository {
         mutableUiState.value = mutableUiState.value.copy(recentChannel = recentChannel)
     }
 
+    // region Reshaped sync (features/reshaped/sync)
+
+    /** The saved source when it is a link or a login; an imported file stays on this phone. */
+    fun syncedSource(): LiveTvSyncSource? {
+        ensureLoaded()
+        val state = mutableUiState.value
+        return when (state.sourceType) {
+            LiveTvSourceType.M3u -> state.sourceUrl.trim()
+                .takeIf { (it.startsWith("http://", true) || it.startsWith("https://", true)) && !LiveTvStorage.hasLocalPlaylistData() }
+                ?.let { LiveTvSyncSource(LiveTvSourceType.M3u, it) }
+            LiveTvSourceType.Xtream -> state.xtreamSettings.takeIf { it.isConfigured }
+                ?.let { LiveTvSyncSource(LiveTvSourceType.Xtream, it.serverUrl, xtream = it) }
+            LiveTvSourceType.Stalker -> state.stalkerSettings.takeIf { it.isConfigured }
+                ?.let { LiveTvSyncSource(LiveTvSourceType.Stalker, it.portalUrl, stalker = it) }
+        }
+    }
+
+    /**
+     * Makes [source] this phone's source (null: none). It is loaded now when the list was in
+     * use, else when Live TV next opens.
+     */
+    fun applySyncedSource(source: LiveTvSyncSource?) {
+        ensureLoaded()
+        val wasShowing = mutableUiState.value.channels.isNotEmpty() || mutableUiState.value.isLoading
+        if (source == null) {
+            disconnect()
+            return
+        }
+        if (wasShowing) {
+            epgScope.launch {
+                when (source.type) {
+                    LiveTvSourceType.M3u -> load(source.url)
+                    LiveTvSourceType.Xtream -> loadXtream(source.xtream)
+                    LiveTvSourceType.Stalker -> loadStalker(source.stalker)
+                }
+            }
+            return
+        }
+        LiveTvStorage.saveLocalPlaylistData("")
+        LiveTvStorage.saveSourceType(source.type)
+        LiveTvStorage.saveSourceUrl(source.url)
+        when (source.type) {
+            LiveTvSourceType.Xtream -> LiveTvStorage.saveXtreamSettings(source.xtream)
+            LiveTvSourceType.Stalker -> LiveTvStorage.saveStalkerSettings(source.stalker)
+            LiveTvSourceType.M3u -> Unit
+        }
+        LiveTvRepositoryStalker.clearSession()
+        stopEpg()
+        mutableUiState.value = LiveTvUiState(
+            sourceType = source.type,
+            sourceUrl = source.url,
+            stalkerSettings = if (source.type == LiveTvSourceType.Stalker) source.stalker else mutableUiState.value.stalkerSettings,
+            xtreamSettings = if (source.type == LiveTvSourceType.Xtream) source.xtream else mutableUiState.value.xtreamSettings,
+            favoriteUrls = mutableUiState.value.favoriteUrls,
+            recentChannel = mutableUiState.value.recentChannel,
+        )
+    }
+
+    /** Sync's change to the favourites, made on top of any made here meanwhile. */
+    fun applySyncedFavorites(before: Set<String>, after: Set<String>) {
+        if (before == after) return
+        ensureLoaded()
+        val next = (mutableUiState.value.favoriteUrls - (before - after)) + (after - before)
+        LiveTvStorage.saveFavoriteUrls(next)
+        mutableUiState.value = mutableUiState.value.copy(favoriteUrls = next)
+    }
+
+    fun applySyncedRecent(channel: LiveTvRecentChannel) {
+        ensureLoaded()
+        LiveTvStorage.saveRecentChannel(channel)
+        mutableUiState.value = mutableUiState.value.copy(recentChannel = channel)
+    }
+
+    // endregion
+
     private suspend fun saveM3uSource(sourceUrl: String, localPlaylistData: String) {
         // The playlist can be megabytes: written off the main thread.
         withContext(Dispatchers.Default) { LiveTvStorage.saveLocalPlaylistData(localPlaylistData) }

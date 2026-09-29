@@ -164,6 +164,22 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
             )
         }
 
+        // Google sign-in for Reshaped sync ("TVs and Limited Input devices" client, shared with the TV
+        // app), from the RESHAPED_GOOGLE_TV_CLIENT_ID / _SECRET secrets.
+        outDir.resolve("com/nuvio/app/features/reshaped/sync").apply {
+            mkdirs()
+            resolve("ReshapedGoogleConfig.kt").writeText(
+                """
+                |package com.nuvio.app.features.reshaped.sync
+                |
+                |internal object ReshapedGoogleConfig {
+                |    const val CLIENT_ID = "${props.getProperty("RESHAPED_GOOGLE_TV_CLIENT_ID", "").trim()}"
+                |    const val CLIENT_SECRET = "${props.getProperty("RESHAPED_GOOGLE_TV_CLIENT_SECRET", "").trim()}"
+                |}
+                """.trimMargin()
+            )
+        }
+
         outDir.resolve("com/nuvio/app/features/details").apply {
             mkdirs()
             resolve("ImdbEpisodeRatingsConfig.kt").writeText(

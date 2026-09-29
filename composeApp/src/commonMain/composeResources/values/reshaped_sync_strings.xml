@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reshaped_sync_section">Sync</string>
+    <string name="reshaped_sync_sign_in_title">Sync with Google</string>
+    <string name="reshaped_sync_sign_in_description">Keep Reshaped settings and Live TV the same on your phone and TVs</string>
+    <string name="reshaped_sync_not_configured">Google sign-in isn\'t set up in this build</string>
+    <string name="reshaped_sync_sign_in_starting">Getting a sign-in code…</string>
+    <string name="reshaped_sync_phone_instruction">Tap the button: the code is copied and Google opens. Paste it if Google asks, pick your account, then come back here.</string>
+    <string name="reshaped_sync_phone_button">Copy code and open Google</string>
+    <string name="reshaped_sync_sign_in_waiting">Waiting for you to approve…</string>
+    <string name="reshaped_sync_sign_in_declined">Sign-in was declined.</string>
+    <string name="reshaped_sync_sign_in_expired">The code expired. Try again for a new one.</string>
+    <string name="reshaped_sync_sign_in_failed">Couldn\'t reach Google. Check the connection and try again.</string>
+    <string name="reshaped_sync_try_again">Try again</string>
+    <string name="reshaped_sync_account_title">Google account</string>
+    <string name="reshaped_sync_signed_in_as">Signed in as %1$s</string>
+    <string name="reshaped_sync_signed_in">Signed in</string>
+    <string name="reshaped_sync_settings_title">Sync Reshaped settings</string>
+    <string name="reshaped_sync_settings_description">AutoSync, pill navigation, the library calendar and more. Buffer size and volume boost stay per device</string>
+    <string name="reshaped_sync_live_tv_title">Sync Live TV</string>
+    <string name="reshaped_sync_live_tv_description">Your source and its login, favourites and the last channel</string>
+    <string name="reshaped_sync_now_title">Sync now</string>
+    <string name="reshaped_sync_never">Not synced yet</string>
+    <string name="reshaped_sync_just_now">Synced just now</string>
+    <string name="reshaped_sync_last_minutes">Last synced %1$d min ago</string>
+    <string name="reshaped_sync_running">Syncing…</string>
+    <string name="reshaped_sync_failed_network">Couldn\'t reach Google. It will try again later</string>
+    <string name="reshaped_sync_failed_signed_out">Google access ended. Sign in again</string>
+    <string name="reshaped_sync_failed_newer">Update Nuvio Reshaped on this device to keep syncing</string>
+    <string name="reshaped_sync_sign_out">Sign out of Google</string>
+    <string name="reshaped_sync_sign_out_description">This phone stops syncing. What was synced stays in your Google account.</string>
+</resources>

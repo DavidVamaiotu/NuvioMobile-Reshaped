@@ -63,6 +63,9 @@ internal fun LazyListScope.nuvioReshapedRootSection(isTablet: Boolean, onClick: 
 /** Everything Nuvio Reshaped adds on top of Nuvio, in one place. */
 internal fun LazyListScope.nuvioReshapedSettingsContent(isTablet: Boolean) {
     item {
+        ReshapedSyncSettingsSection(isTablet = isTablet)
+    }
+    item {
         val liveTvEnabled by remember {
             LiveTvTabSettings.ensureLoaded()
             LiveTvTabSettings.enabled

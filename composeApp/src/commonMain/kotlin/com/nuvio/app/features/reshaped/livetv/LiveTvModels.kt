@@ -141,3 +141,20 @@ private fun String.looksLikePlaylistUrl(): Boolean {
     return path.endsWith(".m3u") || path.endsWith(".m3u8") ||
         (path.endsWith("/get.php") && "type=m3u" in lower)
 }
+
+/** A source as Reshaped sync carries it between devices (the TV app's sources are the same). */
+data class LiveTvSyncSource(
+    val type: LiveTvSourceType,
+    /** The M3U link, or the server or portal URL. */
+    val url: String,
+    val stalker: LiveTvStalkerSettings = LiveTvStalkerSettings(),
+    val xtream: LiveTvXtreamSettings = LiveTvXtreamSettings(),
+) {
+    /** The same as the TV app's: two sources with the same identity are one. */
+    val identity: String
+        get() = when (type) {
+            LiveTvSourceType.M3u -> "m3u|${url.lowercase()}"
+            LiveTvSourceType.Xtream -> "xtream|${xtream.serverUrl.lowercase()}|${xtream.username}"
+            LiveTvSourceType.Stalker -> "stalker|${stalker.portalUrl.lowercase()}|${stalker.macAddress}"
+        }
+}

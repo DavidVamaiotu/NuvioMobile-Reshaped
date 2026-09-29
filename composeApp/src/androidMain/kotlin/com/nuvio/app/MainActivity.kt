@@ -151,6 +151,7 @@ open class MainActivity : AppCompatActivity() {
         PluginStorage.initialize(applicationContext)
         LiveTvStorage.initialize(applicationContext) // Nuvio RS Live TV hook
         LiveTvPlaylistFileBridge.bindActivity(this) // Nuvio RS Live TV hook
+        com.nuvio.app.features.reshaped.sync.ReshapedSyncAndroid.install(applicationContext) // Nuvio RS hook: sync through the viewer's Google account
         CollectionMobileSettingsStorage.initialize(applicationContext)
         CollectionStorage.initialize(applicationContext)
         DownloadsStorage.initialize(applicationContext)
