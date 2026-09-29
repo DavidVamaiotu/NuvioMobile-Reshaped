@@ -1,6 +1,6 @@
 name: AutoSync Release
 
-# Release trigger: rebuild with Google sign-in keys for Reshaped sync
+# Release trigger: Sync with Google (drive.file sign-in fix)
 
 
 on:

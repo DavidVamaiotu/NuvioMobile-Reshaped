@@ -1,3 +1,3 @@
-- **Smoother playback while AutoSync works.** The player no longer waits on AutoSync's background work, and AutoSync reuses its calculations instead of redoing them. Sync results are unchanged.
-- **Less wasted work for on-device previews.** When the preview spool is full, frames that would be thrown away are no longer copied.
-- **Based on Nuvio 0.5.4-beta.** Includes Nuvio's latest fixes, such as smaller default playback buffers and custom posters kept when returning to a title.
+- **Sync with Google.** Settings > Nuvio Reshaped > Sync keeps Reshaped settings and Live TV (your source and its login, favourites, last channel) the same on your phone and TVs. Both switches are off until you turn them on, and the data stays in one file in your own Google Drive.
+- **Faster, steadier seeking.** Rapid seeks cancel the stale connection instead of waiting for it.
+- **Better styled subtitles** and a refined glass effect on the AutoSync bubble.
