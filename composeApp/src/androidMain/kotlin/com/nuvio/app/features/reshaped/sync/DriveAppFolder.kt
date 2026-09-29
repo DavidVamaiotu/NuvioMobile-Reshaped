@@ -20,11 +20,11 @@ import org.json.JSONObject
 internal data class DriveSyncFile(val id: String?, val text: String?, val others: List<Pair<String, String>> = emptyList())
 
 /**
- * Reads and writes Reshaped's one file in the Google account's hidden app folder (Drive's
- * "appDataFolder"): only this app can see it, and it does not count as the viewer's files.
+ * Reads and writes Reshaped's one file in the viewer's Google Drive. With the drive.file scope
+ * the app sees only files it made itself (with this Google client), never the viewer's others.
  */
 internal object DriveAppFolder {
-    const val FILE_NAME = "nuvio-reshaped-sync.json"
+    const val FILE_NAME = "Nuvio Reshaped sync.json"
     private const val FILES_URL = "https://www.googleapis.com/drive/v3/files"
     private const val UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files"
     private val JSON = "application/json; charset=UTF-8".toMediaType()
@@ -34,7 +34,7 @@ internal object DriveAppFolder {
 
     suspend fun read(context: Context): DriveSyncFile {
         val listUrl = FILES_URL.toHttpUrl().newBuilder()
-            .addQueryParameter("spaces", "appDataFolder")
+            .addQueryParameter("spaces", "drive")
             .addQueryParameter("q", "name = '$FILE_NAME' and trashed = false")
             .addQueryParameter("fields", "files(id,modifiedTime)")
             .addQueryParameter("orderBy", "modifiedTime desc")
@@ -77,7 +77,7 @@ internal object DriveAppFolder {
             if (updated.isSuccess) return id
             // The file was deleted meanwhile (the viewer cleared the app's Drive data): create it again.
         }
-        val metadata = JSONObject().put("name", FILE_NAME).put("parents", JSONArray().put("appDataFolder")).toString()
+        val metadata = JSONObject().put("name", FILE_NAME).put("mimeType", "application/json").toString()
         val created = call(context) { token ->
             val body = MultipartBody.Builder()
                 .setType("multipart/related".toMediaType())
@@ -112,6 +112,10 @@ internal object DriveAppFolder {
         isSuccessful -> body?.string().orEmpty()
         code == 401 -> null
         code == 404 -> throw NotFoundException()
-        else -> throw IOException("Drive HTTP $code")
+        else -> {
+            // Google's reason (Drive API not enabled, quota) so the settings can show it.
+            val reason = runCatching { JSONObject(body?.string().orEmpty()).optJSONObject("error")?.optString("message") }.getOrNull()
+            throw IOException(if (reason.isNullOrBlank()) "Drive HTTP $code" else "Drive HTTP $code: $reason")
+        }
     }
 }

@@ -54,7 +54,9 @@ import nuvio.composeapp.generated.resources.reshaped_sync_settings_title
 import nuvio.composeapp.generated.resources.reshaped_sync_sign_in_declined
 import nuvio.composeapp.generated.resources.reshaped_sync_sign_in_description
 import nuvio.composeapp.generated.resources.reshaped_sync_sign_in_expired
+import nuvio.composeapp.generated.resources.reshaped_sync_sign_in_detail
 import nuvio.composeapp.generated.resources.reshaped_sync_sign_in_failed
+import nuvio.composeapp.generated.resources.reshaped_sync_sign_in_refused
 import nuvio.composeapp.generated.resources.reshaped_sync_sign_in_starting
 import nuvio.composeapp.generated.resources.reshaped_sync_sign_in_title
 import nuvio.composeapp.generated.resources.reshaped_sync_sign_in_waiting
@@ -117,7 +119,8 @@ internal fun ReshapedSyncSettingsSection(isTablet: Boolean) {
                         title = stringResource(Res.string.reshaped_sync_now_title),
                         description = when {
                             status.running -> stringResource(Res.string.reshaped_sync_running)
-                            status.failed == ReshapedSyncFailure.Network -> stringResource(Res.string.reshaped_sync_failed_network)
+                            status.failed == ReshapedSyncFailure.Network -> stringResource(Res.string.reshaped_sync_failed_network) +
+                                status.failedDetail.takeIf(String::isNotBlank)?.let { "\n" + it }.orEmpty()
                             status.failed == ReshapedSyncFailure.SignedOut -> stringResource(Res.string.reshaped_sync_failed_signed_out)
                             status.failed == ReshapedSyncFailure.NewerVersion -> stringResource(Res.string.reshaped_sync_failed_newer)
                             status.lastSyncedAtMs == 0L -> stringResource(Res.string.reshaped_sync_never)
@@ -191,15 +194,25 @@ private fun GoogleSignInDialog(controller: ReshapedSyncController, state: Reshap
                         }
                         DialogText(stringResource(Res.string.reshaped_sync_sign_in_waiting))
                     }
-                    is ReshapedSignInState.Failed -> DialogText(
-                        stringResource(
-                            when {
-                                state.declined -> Res.string.reshaped_sync_sign_in_declined
-                                state.expired -> Res.string.reshaped_sync_sign_in_expired
-                                else -> Res.string.reshaped_sync_sign_in_failed
-                            }
+                    is ReshapedSignInState.Failed -> {
+                        DialogText(
+                            stringResource(
+                                when {
+                                    state.declined -> Res.string.reshaped_sync_sign_in_declined
+                                    state.expired -> Res.string.reshaped_sync_sign_in_expired
+                                    state.refused -> Res.string.reshaped_sync_sign_in_refused
+                                    else -> Res.string.reshaped_sync_sign_in_failed
+                                }
+                            )
                         )
-                    )
+                        if (state.detail.isNotBlank() && !state.declined && !state.expired) {
+                            Text(
+                                text = stringResource(Res.string.reshaped_sync_sign_in_detail, state.detail),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),

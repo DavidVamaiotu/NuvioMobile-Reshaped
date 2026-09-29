@@ -29,14 +29,16 @@ internal data class GoogleDeviceCode(
 
 /**
  * The Google account Reshaped syncs to, signed in with Google's sign-in for TVs, the same
- * client as the TV app (a code approved in the browser, no Play Services needed). Only the Drive app folder scope is asked for: the app
- * sees its own hidden folder, never the viewer's files.
+ * client as the TV app (a code approved in the browser, no Play Services needed). Only Drive access to the app's own files is asked for: the app
+ * sees only the file it made, never the viewer's other files.
  */
 internal object GoogleAccount {
     private const val PREFS = "nuvio_reshaped_sync_account"
     private const val KEY_REFRESH = "refresh_token"
     private const val KEY_EMAIL = "email"
-    private const val DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata"
+    // Google's TV sign-in allows only a few scopes: drive.file (files this app made), not the
+    // hidden app folder (drive.appdata is refused with invalid_scope).
+    private const val DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file"
     private const val SCOPES = "openid email $DRIVE_SCOPE"
     private const val DEVICE_CODE_URL = "https://oauth2.googleapis.com/device/code"
     private const val TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -86,7 +88,7 @@ internal object GoogleAccount {
             .add("scope", SCOPES)
             .build()
         val json = post(DEVICE_CODE_URL, body)
-        if (json.has("error")) throw GoogleAuthException(json.optString("error"))
+        if (json.has("error")) throw GoogleAuthException(json.optString("error"), json.optString("error_description"))
         return GoogleDeviceCode(
             deviceCode = json.getString("device_code"),
             userCode = json.getString("user_code"),
@@ -134,7 +136,7 @@ internal object GoogleAccount {
                 }
                 "authorization_pending" -> Unit
                 "slow_down" -> interval += 5_000
-                else -> throw GoogleAuthException(json.optString("error"))
+                else -> throw GoogleAuthException(json.optString("error"), json.optString("error_description"))
             }
         }
         throw GoogleAuthException("expired_token")
@@ -211,4 +213,8 @@ internal object GoogleAccount {
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }
 
-internal class GoogleAuthException(val code: String) : Exception("Google sign-in failed: $code")
+internal class GoogleAuthException(val code: String, val description: String = "") :
+    Exception("Google sign-in failed: $code ${description}".trim()) {
+    /** Google's own words, for the viewer to act on (a wrong client type, a scope not allowed). */
+    val detail: String get() = if (description.isBlank()) code else "$code: $description"
+}
