@@ -14,6 +14,7 @@ import com.nuvio.app.features.reshaped.livetv.LiveTvRecentChannel
 import com.nuvio.app.features.reshaped.livetv.LiveTvRepository
 import com.nuvio.app.features.reshaped.livetv.LiveTvSourceType
 import com.nuvio.app.features.reshaped.livetv.LiveTvStalkerSettings
+import com.nuvio.app.features.reshaped.livetv.LiveTvStorage
 import com.nuvio.app.features.reshaped.livetv.LiveTvSyncSource
 import com.nuvio.app.features.reshaped.livetv.LiveTvTabSettings
 import com.nuvio.app.features.reshaped.livetv.LiveTvXtreamSettings
@@ -24,6 +25,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,6 +58,8 @@ internal object ReshapedSyncAndroid : ReshapedSyncController {
     private const val KEY_LIVE_TV = "sync_live_tv"
     private const val KEY_LAST_SYNC = "last_sync_ms"
     private const val FOREGROUND_MIN_GAP_MS = 60_000L
+    /** The first sync waits until the app has finished starting. */
+    private const val START_DELAY_MS = 8_000L
     private const val SHARED = "settings/shared"
     private const val MOBILE = "settings/mobile"
 
@@ -159,9 +164,13 @@ internal object ReshapedSyncAndroid : ReshapedSyncController {
 
     private fun onForeground() {
         val now = SystemClock.elapsedRealtime()
-        if (lastForegroundSyncMs != 0L && now - lastForegroundSyncMs < FOREGROUND_MIN_GAP_MS) return
+        val firstStart = lastForegroundSyncMs == 0L
+        if (!firstStart && now - lastForegroundSyncMs < FOREGROUND_MIN_GAP_MS) return
         lastForegroundSyncMs = now
-        scope.launch { sync(onlyIfChanged = false) }
+        scope.launch {
+            if (firstStart) delay(START_DELAY_MS)
+            sync(onlyIfChanged = false)
+        }
     }
 
     private suspend fun sync(onlyIfChanged: Boolean) {
@@ -171,24 +180,30 @@ internal object ReshapedSyncAndroid : ReshapedSyncController {
         if (!GoogleAccount.isConfigured || !GoogleAccount.isSignedIn(appContext)) return
         mutex.withLock {
             val base = readBase()
-            val settings = if (settingsOn) currentSettings() else emptyMap()
-            val profileId = if (liveTvOn) resolveLiveTvStorageProfileId() else null
-            val liveTv = profileId?.let { currentLiveTv(it, base) }.orEmpty()
+            // Settings and Live TV are read and changed on the main thread, as their screens do.
+            val (settings, profileId, liveTv) = withContext(Dispatchers.Main) {
+                val settings = if (settingsOn) currentSettings() else emptyMap()
+                val profileId = if (liveTvOn) resolveLiveTvStorageProfileId() else null
+                Triple(settings, profileId, profileId?.let { currentLiveTv(it, base) }.orEmpty())
+            }
             val current = settings + liveTv
             if (onlyIfChanged && SyncDoc.stamp(base, current, 0L) == base) return
             _status.update { it.copy(running = true) }
             try {
                 val remoteFile = DriveAppFolder.read(appContext)
-                val remote = SyncDoc.decode(remoteFile.text)
+                val remote = remoteFile.others.fold(SyncDoc.decode(remoteFile.text)) { doc, (_, text) -> SyncDoc.merge(SyncDoc.decode(text), doc) }
                 val now = SyncDoc.stampTime(System.currentTimeMillis(), base, remote)
                 val merged = SyncDoc.prune(SyncDoc.merge(SyncDoc.stamp(base, current, now), remote), now)
-                if (settingsOn) applySettings(settings, merged)
-                if (profileId != null) applyLiveTv(profileId, liveTv, merged)
-                driveFileId = if (merged != remote || remoteFile.id == null) {
+                withContext(Dispatchers.Main) {
+                    if (settingsOn) applySettings(settings, merged)
+                    if (profileId != null) applyLiveTv(profileId, liveTv, merged)
+                }
+                driveFileId = if (merged != remote || remoteFile.id == null || remoteFile.others.isNotEmpty()) {
                     DriveAppFolder.write(appContext, remoteFile.id ?: driveFileId, SyncDoc.encode(merged))
                 } else {
                     remoteFile.id
                 }
+                remoteFile.others.forEach { (id, _) -> runCatching { DriveAppFolder.delete(appContext, id) } }
                 writeBase(merged)
                 val syncedAt = System.currentTimeMillis()
                 prefs().edit().putLong(KEY_LAST_SYNC, syncedAt).apply()
@@ -283,7 +298,7 @@ internal object ReshapedSyncAndroid : ReshapedSyncController {
                 // Removed on another device: take another synced source, or none.
                 LiveTvRepository.applySyncedSource(afterSources.values.firstNotNullOfOrNull { (it as? JsonObject)?.toSource() })
             }
-            own == null && LiveTvRepository.uiState.value.sourceUrl.isBlank() -> {
+            own == null && LiveTvRepository.uiState.value.sourceUrl.isBlank() && !LiveTvStorage.hasLocalPlaylistData() -> {
                 // No source here yet: take one another device added.
                 val added = afterSources.filterKeys { it !in beforeSources || beforeSources.isEmpty() }
                 added.values.firstNotNullOfOrNull { (it as? JsonObject)?.toSource() }?.let(LiveTvRepository::applySyncedSource)

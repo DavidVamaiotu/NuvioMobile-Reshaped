@@ -379,9 +379,9 @@ object LiveTvRepository {
             LiveTvSourceType.M3u -> state.sourceUrl.trim()
                 .takeIf { (it.startsWith("http://", true) || it.startsWith("https://", true)) && !LiveTvStorage.hasLocalPlaylistData() }
                 ?.let { LiveTvSyncSource(LiveTvSourceType.M3u, it) }
-            LiveTvSourceType.Xtream -> state.xtreamSettings.takeIf { it.isConfigured }
+            LiveTvSourceType.Xtream -> state.xtreamSettings.normalized().takeIf { it.isConfigured }
                 ?.let { LiveTvSyncSource(LiveTvSourceType.Xtream, it.serverUrl, xtream = it) }
-            LiveTvSourceType.Stalker -> state.stalkerSettings.takeIf { it.isConfigured }
+            LiveTvSourceType.Stalker -> state.stalkerSettings.normalized().takeIf { it.isConfigured }
                 ?.let { LiveTvSyncSource(LiveTvSourceType.Stalker, it.portalUrl, stalker = it) }
         }
     }

@@ -36,7 +36,8 @@ internal object GoogleAccount {
     private const val PREFS = "nuvio_reshaped_sync_account"
     private const val KEY_REFRESH = "refresh_token"
     private const val KEY_EMAIL = "email"
-    private const val SCOPES = "openid email https://www.googleapis.com/auth/drive.appdata"
+    private const val DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata"
+    private const val SCOPES = "openid email $DRIVE_SCOPE"
     private const val DEVICE_CODE_URL = "https://oauth2.googleapis.com/device/code"
     private const val TOKEN_URL = "https://oauth2.googleapis.com/token"
     private const val REVOKE_URL = "https://oauth2.googleapis.com/revoke"
@@ -117,6 +118,12 @@ internal object GoogleAccount {
             when (json.optString("error")) {
                 "" -> {
                     val refresh = json.optString("refresh_token").ifBlank { throw GoogleAuthException("no_refresh_token") }
+                    val scopes = json.optString("scope")
+                    if (scopes.isNotBlank() && DRIVE_SCOPE !in scopes.split(' ')) {
+                        // The viewer unticked Drive on Google's consent page: sync could never work.
+                        runCatching { post(REVOKE_URL, FormBody.Builder().add("token", refresh).build()) }
+                        throw GoogleAuthException("access_denied")
+                    }
                     val email = emailFromIdToken(json.optString("id_token")).orEmpty()
                     prefs(context).edit().putString(KEY_REFRESH, refresh).putString(KEY_EMAIL, email).apply()
                     accessToken = json.optString("access_token").ifBlank { null }

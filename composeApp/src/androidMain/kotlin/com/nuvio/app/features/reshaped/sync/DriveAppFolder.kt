@@ -13,8 +13,11 @@ import okhttp3.Response
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** The synced file as read: its Drive id (null when there is none yet) and text. */
-internal data class DriveSyncFile(val id: String?, val text: String?)
+/**
+ * The synced file as read: its Drive id (null when there is none yet) and text. [others] are
+ * copies two devices created at once on their first sync; sync merges them in, then deletes them.
+ */
+internal data class DriveSyncFile(val id: String?, val text: String?, val others: List<Pair<String, String>> = emptyList())
 
 /**
  * Reads and writes Reshaped's one file in the Google account's hidden app folder (Drive's
@@ -39,11 +42,23 @@ internal object DriveAppFolder {
             .build()
         val files = call(context) { token -> Request.Builder().url(listUrl).header("Authorization", "Bearer $token").build() }
             .let { JSONObject(it).optJSONArray("files") ?: JSONArray() }
-        val id = files.optJSONObject(0)?.optString("id")?.takeIf(String::isNotBlank) ?: return DriveSyncFile(null, null)
-        val text = call(context) { token ->
-            Request.Builder().url("$FILES_URL/$id?alt=media").header("Authorization", "Bearer $token").build()
+        val ids = (0 until files.length()).mapNotNull { files.optJSONObject(it)?.optString("id")?.takeIf(String::isNotBlank) }
+        val id = ids.firstOrNull() ?: return DriveSyncFile(null, null)
+        val others = ids.drop(1).mapNotNull { other -> runCatching { other to download(context, other) }.getOrNull() }
+        return DriveSyncFile(id, download(context, id), others)
+    }
+
+    private suspend fun download(context: Context, id: String): String = call(context) { token ->
+        Request.Builder().url("$FILES_URL/$id?alt=media").header("Authorization", "Bearer $token").build()
+    }
+
+    /** Deletes the file [id]; one already gone is fine. */
+    suspend fun delete(context: Context, id: String) {
+        try {
+            call(context) { token -> Request.Builder().url("$FILES_URL/$id").header("Authorization", "Bearer $token").delete().build() }
+        } catch (gone: NotFoundException) {
+            // Deleted by the other device meanwhile.
         }
-        return DriveSyncFile(id, text)
     }
 
     /** Writes [text] to the file [id], or a new file when [id] is null. Returns the file's id. */
