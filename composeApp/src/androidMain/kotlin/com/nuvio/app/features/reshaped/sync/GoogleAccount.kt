@@ -86,7 +86,7 @@ internal object GoogleAccount {
             .add("scope", SCOPES)
             .build()
         val json = post(DEVICE_CODE_URL, body)
-        if (json.has("error")) throw GoogleAuthException(json.optString("error"))
+        if (json.has("error")) throw GoogleAuthException(json.optString("error"), json.optString("error_description"))
         return GoogleDeviceCode(
             deviceCode = json.getString("device_code"),
             userCode = json.getString("user_code"),
@@ -134,7 +134,7 @@ internal object GoogleAccount {
                 }
                 "authorization_pending" -> Unit
                 "slow_down" -> interval += 5_000
-                else -> throw GoogleAuthException(json.optString("error"))
+                else -> throw GoogleAuthException(json.optString("error"), json.optString("error_description"))
             }
         }
         throw GoogleAuthException("expired_token")
@@ -211,4 +211,8 @@ internal object GoogleAccount {
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }
 
-internal class GoogleAuthException(val code: String) : Exception("Google sign-in failed: $code")
+internal class GoogleAuthException(val code: String, val description: String = "") :
+    Exception("Google sign-in failed: $code ${description}".trim()) {
+    /** Google's own words, for the viewer to act on (a wrong client type, a scope not allowed). */
+    val detail: String get() = if (description.isBlank()) code else "$code: $description"
+}

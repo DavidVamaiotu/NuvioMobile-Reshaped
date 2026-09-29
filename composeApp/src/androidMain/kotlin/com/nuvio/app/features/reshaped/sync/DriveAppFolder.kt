@@ -112,6 +112,10 @@ internal object DriveAppFolder {
         isSuccessful -> body?.string().orEmpty()
         code == 401 -> null
         code == 404 -> throw NotFoundException()
-        else -> throw IOException("Drive HTTP $code")
+        else -> {
+            // Google's reason (Drive API not enabled, quota) so the settings can show it.
+            val reason = runCatching { JSONObject(body?.string().orEmpty()).optJSONObject("error")?.optString("message") }.getOrNull()
+            throw IOException(if (reason.isNullOrBlank()) "Drive HTTP $code" else "Drive HTTP $code: $reason")
+        }
     }
 }

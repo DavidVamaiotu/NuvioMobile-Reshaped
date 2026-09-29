@@ -124,9 +124,19 @@ internal object ReshapedSyncAndroid : ReshapedSyncController {
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: GoogleAuthException) {
-                _signIn.value = ReshapedSignInState.Failed(declined = error.code == "access_denied", expired = error.code == "expired_token")
+                Log.w(TAG, "Google sign-in refused: ${error.detail}")
+                _signIn.value = ReshapedSignInState.Failed(
+                    declined = error.code == "access_denied",
+                    expired = error.code == "expired_token",
+                    refused = error.code !in setOf("access_denied", "expired_token"),
+                    detail = error.detail,
+                )
             } catch (error: Exception) {
-                _signIn.value = ReshapedSignInState.Failed(declined = false, expired = false)
+                Log.w(TAG, "Google sign-in failed", error)
+                _signIn.value = ReshapedSignInState.Failed(
+                    declined = false, expired = false, refused = false,
+                    detail = error.message?.takeIf(String::isNotBlank) ?: error::class.simpleName.orEmpty(),
+                )
             }
         }
     }
@@ -218,7 +228,7 @@ internal object ReshapedSyncAndroid : ReshapedSyncController {
                     is SyncDoc.NewerFormatException -> ReshapedSyncFailure.NewerVersion
                     else -> ReshapedSyncFailure.Network
                 }
-                _status.update { it.copy(running = false, failed = failure) }
+                _status.update { it.copy(running = false, failed = failure, failedDetail = error.message.orEmpty()) }
             }
         }
     }

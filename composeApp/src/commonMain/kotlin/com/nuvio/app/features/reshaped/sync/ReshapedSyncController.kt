@@ -8,13 +8,21 @@ data class ReshapedSyncStatus(
     val running: Boolean = false,
     val lastSyncedAtMs: Long = 0L,
     val failed: ReshapedSyncFailure? = null,
+    /** What went wrong, in Google's words when it said. */
+    val failedDetail: String = "",
 )
 
 /** Google's TV-style sign-in, done in the phone's browser: a code to paste at [verificationUrl]. */
 sealed interface ReshapedSignInState {
     data object Starting : ReshapedSignInState
     data class Waiting(val userCode: String, val verificationUrl: String) : ReshapedSignInState
-    data class Failed(val declined: Boolean, val expired: Boolean) : ReshapedSignInState
+    /** [refused]: Google turned the request down (its reason in [detail]); else a network failure. */
+    data class Failed(
+        val declined: Boolean,
+        val expired: Boolean,
+        val refused: Boolean = false,
+        val detail: String = "",
+    ) : ReshapedSignInState
 }
 
 /**
