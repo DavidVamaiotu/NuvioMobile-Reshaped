@@ -14,6 +14,7 @@ internal object AutoSyncBubbleToastsAndroid {
             save = { preferences.edit().putBoolean(enabledKey, it).apply() },
         )
         AutoSyncBubbleBackdrop.sampler = { bounds, marginPx -> rememberVideoBackdrop(bounds, marginPx) }
+        AutoSyncBubbleBackdrop.painter = { rememberBubbleGlassPainter() }
     }
 }
 

@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import kotlin.concurrent.Volatile
 
 /** A small, soft copy of the video behind the bubble, and where it was taken from (window px). */
@@ -20,9 +21,20 @@ internal class BubbleWindowBounds {
 }
 
 /**
+ * Draws a copied frame as refracting glass in a single pass (the pill's lens), filling the bubble
+ * of [corner] radius. [bubble] is where the bubble sits in the window, like [BubbleWindowBounds.rect].
+ */
+internal fun interface BubbleBackdropPainter {
+    fun DrawScope.paint(frame: BubbleBackdropFrame, bubble: Rect, corner: Float)
+}
+
+/**
  * The platform's way to see the video behind the bubble, so the glass can blur and bend it.
  * Installed on Android; without it the bubble draws its plain frosted glass.
  */
 internal object AutoSyncBubbleBackdrop {
     var sampler: (@Composable (bounds: BubbleWindowBounds, marginPx: Float) -> State<BubbleBackdropFrame?>)? = null
+
+    /** A one-pass glass painter where the platform has one; otherwise the frame is blurred in its own layer. */
+    var painter: (@Composable () -> BubbleBackdropPainter?)? = null
 }
