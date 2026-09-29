@@ -285,8 +285,10 @@ internal object ReshapedSyncAndroid : ReshapedSyncController {
         val known = SyncDoc.values(base, sources(profileId))
         val own = LiveTvRepository.syncedSource()
         val sourceSection = if (own == null) known else {
-            val id = (known[own.identity] as? JsonObject)?.text("id").orEmpty()
-            known + (own.identity to own.toJson(id))
+            val saved = known[own.identity] as? JsonObject
+            val id = saved?.text("id").orEmpty()
+            // Fields the phone does not have (the TV's guide link) are kept as the file has them.
+            known + (own.identity to JsonObject(saved.orEmpty() + own.toJson(id)))
         }
         return mapOf(
             sources(profileId) to sourceSection,
@@ -305,8 +307,12 @@ internal object ReshapedSyncAndroid : ReshapedSyncController {
                 if (updated != null && updated != own) LiveTvRepository.applySyncedSource(updated)
             }
             own != null && own.identity in beforeSources -> {
-                // Removed on another device: take another synced source, or none.
-                LiveTvRepository.applySyncedSource(afterSources.values.firstNotNullOfOrNull { (it as? JsonObject)?.toSource() })
+                // Removed, or edited (new address or login) on another device: a source of the same
+                // kind that came in at the same time is taken to be the edited one, else any other, or none.
+                val added = afterSources.filterKeys { it !in beforeSources }.values.mapNotNull { (it as? JsonObject)?.toSource() }
+                val replacement = added.firstOrNull { it.type == own.type }
+                    ?: afterSources.values.firstNotNullOfOrNull { (it as? JsonObject)?.toSource() }
+                LiveTvRepository.applySyncedSource(replacement)
             }
             own == null && LiveTvRepository.uiState.value.sourceUrl.isBlank() && !LiveTvStorage.hasLocalPlaylistData() -> {
                 // No source here yet: take one another device added.
