@@ -15,6 +15,7 @@ import androidx.media3.extractor.PositionHolder
 import androidx.media3.extractor.SeekMap
 import androidx.media3.extractor.SniffFailure
 import androidx.media3.extractor.TrackOutput
+import com.nuvio.app.features.player.RewrappableExtractor
 import java.io.EOFException
 
 /** Receives compressed audio samples as the player downloads and demuxes them, ahead of playback. */
@@ -50,7 +51,10 @@ internal class AudioSyncExtractorsFactory(
 private class AudioTapExtractor(
     private val delegate: Extractor,
     private val sink: AudioSampleSink,
-) : Extractor {
+) : RewrappableExtractor {
+    override val wrappedExtractor: Extractor get() = delegate
+    override fun rewrap(inner: Extractor): Extractor = AudioTapExtractor(inner, sink)
+
     override fun sniff(input: ExtractorInput): Boolean = delegate.sniff(input)
 
     override fun getSniffFailureDetails(): List<SniffFailure> = delegate.sniffFailureDetails

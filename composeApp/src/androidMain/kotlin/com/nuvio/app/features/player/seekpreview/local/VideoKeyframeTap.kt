@@ -15,6 +15,7 @@ import androidx.media3.extractor.PositionHolder
 import androidx.media3.extractor.SeekMap
 import androidx.media3.extractor.SniffFailure
 import androidx.media3.extractor.TrackOutput
+import com.nuvio.app.features.player.RewrappableExtractor
 import java.io.EOFException
 
 /** Receives the video keyframes playback downloads, to turn them into free thumbnails. */
@@ -53,7 +54,10 @@ internal class VideoKeyframeExtractorsFactory(
 private class VideoTapExtractor(
     private val delegate: Extractor,
     private val sink: KeyframeSink,
-) : Extractor {
+) : RewrappableExtractor {
+    override val wrappedExtractor: Extractor get() = delegate
+    override fun rewrap(inner: Extractor): Extractor = VideoTapExtractor(inner, sink)
+
     override fun sniff(input: ExtractorInput): Boolean = delegate.sniff(input)
 
     override fun getSniffFailureDetails(): List<SniffFailure> = delegate.sniffFailureDetails
