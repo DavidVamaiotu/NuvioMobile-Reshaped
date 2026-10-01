@@ -121,6 +121,10 @@ internal class AsrSyncEngine(
     private var released = false
     private var worker: Thread? = null
 
+    /** False while recognition cannot help (no recogniser, no usable reference, foreign audio). */
+    @Volatile
+    private var listening = true
+
     /** Heard words so far; exposed for diagnostics. */
     val heardWordCount: Int get() = synchronized(lock) { heard.size }
 
@@ -130,6 +134,22 @@ internal class AsrSyncEngine(
     fun setRecognizer(recognizer: SpeechToText?) {
         stt = recognizer
         synchronized(lock) { lock.notifyAll() }
+    }
+
+    /**
+     * Whether speech is worth keeping for recognition. Off, nothing is queued (queued speech is
+     * dropped), so a stream that can never be recognised holds no audio; words already heard stay.
+     */
+    fun setListening(on: Boolean) {
+        synchronized(lock) {
+            if (listening == on) return
+            listening = on
+            if (!on) {
+                queue.clear()
+                queuedSamples = 0
+            }
+            lock.notifyAll()
+        }
     }
 
     fun onPlayhead(positionMs: Long) {
@@ -143,7 +163,7 @@ internal class AsrSyncEngine(
     fun offerSegment(startFrame: Int, samples: FloatArray, spread: Boolean = false) {
         val segment = Segment(startFrame, samples, spread)
         synchronized(lock) {
-            if (released) return
+            if (released || !listening) return
             val range = segment.startFrame until segment.endFrame
             // The look-ahead and live paths can deliver the same stretch; skip what is mostly known.
             val overlap = covered.sumOf { overlap(it, range) } + queue.sumOf { overlap(it.startFrame until it.endFrame, range) }
@@ -177,6 +197,7 @@ internal class AsrSyncEngine(
         synchronized(lock) {
             if (references.any { it.key == reference.key }) return
             references = references + reference
+            lock.notifyAll()
         }
         evaluate()
     }
@@ -245,7 +266,8 @@ internal class AsrSyncEngine(
         runCatching(workerSetup)
         while (true) {
             val (segment, recognizer) = synchronized(lock) {
-                while (!released && (queue.isEmpty() || stt == null || target == null)) lock.wait()
+                // Nothing to match words against yet: recognising now would be wasted work.
+                while (!released && (queue.isEmpty() || stt == null || target == null || references.isEmpty())) lock.wait()
                 if (released) return
                 nextSegment().also { queuedSamples -= it.samples.size } to stt!!
             }
@@ -306,7 +328,8 @@ internal class AsrSyncEngine(
         } else {
             mostLikelyRate(targetTrack, words, fit, bridge)
         }
-        val shiftMs = fine?.shiftMs ?: coarseShiftMs
+        val trustedFine = fine?.takeIf { isTrustedMove(it, coarseShiftMs) }
+        val shiftMs = trustedFine?.shiftMs ?: coarseShiftMs
         val segments = piecewise(targetTrack, words, reference, fit, scale, shiftMs)
             ?: listOf(SubtitleSyncSegment(0L, scale, shiftMs))
         val result = AsrLock(
@@ -314,7 +337,7 @@ internal class AsrSyncEngine(
             shiftMs = segments.first().shiftMs,
             referenceKey = reference.key,
             anchorScore = fit.score,
-            fineTuned = fine != null,
+            fineTuned = trustedFine != null,
             final = rateKnown || locked,
             segments = segments,
         )
@@ -396,7 +419,8 @@ internal class AsrSyncEngine(
         val tuned = parts.map { part ->
             val fromFrame = ((part.fits.first().anchorSec - PART_CONTEXT_SEC) * 1_000 / frameMs).toInt().coerceAtLeast(0)
             val toFrame = ((part.fits.last().anchorSec + PART_CONTEXT_SEC) * 1_000 / frameMs).toInt()
-            fineTune(track, scale, part.shiftMs, fromFrame, toFrame)?.shiftMs ?: part.shiftMs
+            fineTune(track, scale, part.shiftMs, fromFrame, toFrame)
+                ?.takeIf { isTrustedMove(it, part.shiftMs) }?.shiftMs ?: part.shiftMs
         }
         val segments = ArrayList<SubtitleSyncSegment>()
         segments += SubtitleSyncSegment(0L, scale, tuned.first())
@@ -495,6 +519,16 @@ internal class AsrSyncEngine(
         return estimate
     }
 
+    /**
+     * Whether a fine-tune estimate may move the word-based offset [coarseShiftMs]. Moves within the
+     * words' own timing uncertainty are taken as before; a larger one needs a peak that stands out,
+     * since a flat speech pattern (dense dialogue, music) could otherwise pull a good word-based
+     * offset by up to [FINE_TUNE_MAX_MOVE_MS].
+     */
+    private fun isTrustedMove(estimate: SubtitleAudioAligner.Estimate, coarseShiftMs: Double): Boolean =
+        abs(estimate.shiftMs - coarseShiftMs) <= FINE_TUNE_FREE_MOVE_MS ||
+            estimate.prominence >= FINE_TUNE_MIN_PROMINENCE
+
     private fun overlap(a: IntRange, b: IntRange): Int =
         (minOf(a.last, b.last) - maxOf(a.first, b.first) + 1).coerceAtLeast(0)
 
@@ -509,6 +543,12 @@ internal class AsrSyncEngine(
         private const val FINE_TUNE_WINDOW_MS = 3_000.0
         private const val FINE_TUNE_MAX_MOVE_MS = 1_200.0
         private const val FINE_TUNE_MIN_CUES = 5
+
+        /** Fine-tune moves up to this need no clear peak: about how far off a word's time can be. */
+        private const val FINE_TUNE_FREE_MOVE_MS = 500.0
+
+        /** Peak lead over any offset more than 2.5 s away that a larger move needs. */
+        private const val FINE_TUNE_MIN_PROMINENCE = 0.05
         private const val FINAL_SPAN_SEC = 180.0
 
         /** Correlation a stretched mapping must win by over the unstretched one. */

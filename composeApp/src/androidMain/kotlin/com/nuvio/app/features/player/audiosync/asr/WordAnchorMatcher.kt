@@ -60,16 +60,19 @@ internal class WordAnchorMatcher(cues: List<Triple<Long, Long, String>>) {
     fun fit(heard: List<HeardWord>, maxShiftSec: Double = MAX_SHIFT_SEC): AnchorFit? {
         val anchors = anchors(heard)
         if (anchors.isEmpty()) return null
-        val unit = cluster(anchors, 1.0, maxShiftSec) ?: return null
+        val unit = cluster(anchors, 1.0, maxShiftSec)
         val span = anchors.maxOf { it.mediaSec } - anchors.minOf { it.mediaSec }
         // Over a short stretch every frame rate fits equally well; judge the rate only on a long span.
         if (span < MIN_RATE_SPAN_SEC) return unit
+        // Other rates are tried even when no word fits at 1x: late in a film a frame-rate mismatch
+        // can put every word further than [maxShiftSec] off at 1x, exactly when a rate is needed.
+        val unitScore = unit?.score ?: 0.0
         var best = unit
         for (scale in RATE_CANDIDATES) {
             val fit = cluster(anchors, scale, maxShiftSec) ?: continue
             // A rate change drifts further every minute: it needs words from several places.
             if (fit.segments < MIN_RATE_SEGMENTS) continue
-            if (fit.score > best.score * RATE_MARGIN && fit.score > unit.score * RATE_MARGIN) best = fit
+            if (fit.score > (best?.score ?: 0.0) * RATE_MARGIN && fit.score > unitScore * RATE_MARGIN) best = fit
         }
         return best
     }

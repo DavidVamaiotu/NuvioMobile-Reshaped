@@ -29,16 +29,19 @@ import kotlin.math.abs
  */
 internal class AudioSpotSampler(
     private val uri: Uri,
-    dataSourceFactory: DataSource.Factory,
+    private val dataSourceFactory: DataSource.Factory,
     private val targetBytes: Long,
     private val maxBytes: Long,
     private val minSpotMs: Long,
 ) {
     class Result(val sampled: Int, val bytes: Long, val failure: String?)
 
+    /** Bytes read over all connections: the budget. */
     private val bytes = AtomicLong()
-    private val countingFactory = DataSource.Factory {
-        dataSourceFactory.createDataSource().apply { addTransferListener(ByteCounter(bytes)) }
+
+    /** Counts into [bytes] and into [connectionBytes], the bytes of one connection. */
+    private fun countingFactory(connectionBytes: AtomicLong) = DataSource.Factory {
+        dataSourceFactory.createDataSource().apply { addTransferListener(ByteCounter(bytes, connectionBytes)) }
     }
 
     /**
@@ -60,7 +63,9 @@ internal class AudioSpotSampler(
         val startedNs = System.nanoTime()
 
         fun work(extractorsFactory: ExtractorsFactory) {
-            val extractor = MediaExtractorCompat(extractorsFactory, countingFactory)
+            // A spot's cost is what its own connection read: the others read other spots meanwhile.
+            val connectionBytes = AtomicLong()
+            val extractor = MediaExtractorCompat(extractorsFactory, countingFactory(connectionBytes))
             try {
                 extractor.setDataSource(uri, 0L)
                 var audioTracks = 0
@@ -80,7 +85,7 @@ internal class AudioSpotSampler(
                     if (index >= spotsMs.size) return
                     val spotStartMs = spotsMs[index]
                     val share = (targetBytes - bytes.get()).coerceAtLeast(0L) / (spotsMs.size - index)
-                    val spotStartBytes = bytes.get()
+                    val spotStartBytes = connectionBytes.get()
                     extractor.seekTo(spotStartMs * 1_000L, MediaExtractorCompat.SEEK_TO_PREVIOUS_SYNC)
                     val firstUs = extractor.sampleTime
                     if (firstUs < 0 || abs(firstUs / 1_000L - spotStartMs) > MAX_SEEK_MISS_MS) {
@@ -91,7 +96,7 @@ internal class AudioSpotSampler(
                     while (!stop()) {
                         val timeUs = extractor.sampleTime
                         if (timeUs < 0 || timeUs >= endUs) break
-                        val spotBytes = bytes.get() - spotStartBytes
+                        val spotBytes = connectionBytes.get() - spotStartBytes
                         if (spotBytes >= share && !wantsMore(spotBytes, timeUs - firstUs, startedNs)) break
                         if (!extractor.advance()) break
                     }
@@ -120,7 +125,7 @@ internal class AudioSpotSampler(
 
     /**
      * Whether a spot past its share keeps reading: only while it has less than [minSpotMs] of audio
-     * ([readUs] so far, costing [spotBytes]) and all workers together download at least
+     * ([readUs] so far, costing its connection [spotBytes]) and all workers together download at least
      * [MIN_SPEED_RATIO] times faster than the stream plays.
      */
     private fun wantsMore(spotBytes: Long, readUs: Long, startedNs: Long): Boolean {
@@ -131,13 +136,14 @@ internal class AudioSpotSampler(
         return downloadBytesPerSec >= MIN_SPEED_RATIO * streamBytesPerSec
     }
 
-    private class ByteCounter(private val bytes: AtomicLong) : TransferListener {
+    private class ByteCounter(private val bytes: AtomicLong, private val connectionBytes: AtomicLong) : TransferListener {
         override fun onTransferInitializing(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) = Unit
 
         override fun onTransferStart(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) = Unit
 
         override fun onBytesTransferred(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean, bytesTransferred: Int) {
             bytes.addAndGet(bytesTransferred.toLong())
+            connectionBytes.addAndGet(bytesTransferred.toLong())
         }
 
         override fun onTransferEnd(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) = Unit

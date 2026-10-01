@@ -7,6 +7,8 @@ import com.nuvio.app.features.player.audiosync.SpeechAnalyzer
  * Cuts the analysed 16 kHz audio into speech segments using the Silero probabilities that are
  * already being computed, so the recogniser only ever sees dialogue: no silence, music-only
  * stretches or effects. Segments are at most [MAX_SEGMENT_FRAMES] long so words come back quickly.
+ * Speech still running when the audio breaks off (a sampled spot ends, a seek) is handed on as it
+ * is rather than dropped: its words are as good as any other.
  */
 internal class SpeechSegmenter(
     private val onSegment: (startFrame: Int, samples: FloatArray) -> Unit,
@@ -22,7 +24,7 @@ internal class SpeechSegmenter(
 
     @Synchronized
     override fun onChunk(frame: Int, chunk: FloatArray, probability: Float) {
-        if (frame != expectedFrame) discard()
+        if (frame != expectedFrame) flushPending()
         expectedFrame = frame + 1
         val speech = probability >= SPEECH_THRESHOLD
         if (!inSpeech) {
@@ -46,7 +48,16 @@ internal class SpeechSegmenter(
     }
 
     @Synchronized
-    override fun onReset() = discard()
+    override fun onReset() = flushPending()
+
+    /** The audio ends here (e.g. sampling is done): hands on the speech in progress. */
+    @Synchronized
+    fun flush() = flushPending()
+
+    private fun flushPending() {
+        if (inSpeech) finish()
+        discard()
+    }
 
     private fun finish() {
         val keepFrames = (lastSpeechFrame - startFrame + 1 + TAIL_FRAMES).coerceAtMost(bufferFrames)
