@@ -39,10 +39,11 @@ result swaps sidecar cues without reloading the media source or discarding its b
 
 ## Verification
 
-The port includes common tests for offsets, drift, grouping, confidence rejection,
-tolerance, dense dialogue, reference consistency, no-fit tracking, and subtitle
-formats. Android host tests cover subtitle HTTP cancellation, shared index requests,
-and retrying an index after its owning request is cancelled.
+Local validation covered offsets, drift, grouping, confidence rejection, tolerance,
+dense dialogue, reference consistency, no-fit tracking, and subtitle formats. Local
+network tests covered subtitle HTTP cancellation, shared index requests, and retrying
+an index after its owning request is cancelled. The test files are kept outside
+the PR at the author’s request.
 
 Physical-device checks still required:
 
