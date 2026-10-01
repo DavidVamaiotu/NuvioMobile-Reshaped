@@ -5,26 +5,39 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * How much of the film the player keeps in memory, so seeks inside it are instant.
- *
- * Nuvio Reshaped owns this setting; persistence is injected by the platform so Nuvio's
- * PlayerSettingsRepository stays untouched. It applies from the next playback.
+ * Seek buffer (Nuvio Reshaped): ExoPlayer's disk cache and memory buffer, set up the way Nuvio TV
+ * does it. Persistence is injected by the platform so Nuvio's PlayerSettingsRepository stays
+ * untouched. Both apply from the next playback.
  */
 internal object PlaybackBufferSettings {
-    /** 0 keeps Nuvio's own buffer sizes. */
+    /** No disk cache: Nuvio's own behaviour. */
     const val NUVIO_DEFAULT_MB = 0
-    val optionsMb = listOf(NUVIO_DEFAULT_MB, 256, 512, 1024)
-    // Off unless the user picks a size: the read-ahead writes to storage at full speed.
+    /** Disk cache sized from free storage, as Nuvio TV's automatic size. */
+    const val AUTO_MB = -1
+    val optionsMb = listOf(NUVIO_DEFAULT_MB, AUTO_MB, 1024, 2048, 4096)
     private const val DEFAULT_MB = NUVIO_DEFAULT_MB
 
     private val _bufferMb = MutableStateFlow(DEFAULT_MB)
+    /** Disk cache size in MB, [NUVIO_DEFAULT_MB] or [AUTO_MB]. */
     val bufferMb: StateFlow<Int> = _bufferMb.asStateFlow()
 
-    private var save: (Int) -> Unit = {}
+    private val _largerMemoryBuffer = MutableStateFlow(false)
+    /** ExoPlayer's buffer sized like Nuvio TV's instead of Nuvio phone's. */
+    val largerMemoryBuffer: StateFlow<Boolean> = _largerMemoryBuffer.asStateFlow()
 
-    fun installPersistence(load: () -> Int?, save: (Int) -> Unit) {
+    private var save: (Int) -> Unit = {}
+    private var saveLargerMemoryBuffer: (Boolean) -> Unit = {}
+
+    fun installPersistence(
+        load: () -> Int?,
+        save: (Int) -> Unit,
+        loadLargerMemoryBuffer: () -> Boolean,
+        saveLargerMemoryBuffer: (Boolean) -> Unit,
+    ) {
         this.save = save
+        this.saveLargerMemoryBuffer = saveLargerMemoryBuffer
         _bufferMb.value = load()?.takeIf { it in optionsMb } ?: DEFAULT_MB
+        _largerMemoryBuffer.value = loadLargerMemoryBuffer()
     }
 
     fun setBufferMb(mb: Int) {
@@ -35,5 +48,11 @@ internal object PlaybackBufferSettings {
 
     fun cycle() {
         setBufferMb(optionsMb[(optionsMb.indexOf(_bufferMb.value) + 1) % optionsMb.size])
+    }
+
+    fun setLargerMemoryBuffer(enabled: Boolean) {
+        if (_largerMemoryBuffer.value == enabled) return
+        _largerMemoryBuffer.value = enabled
+        saveLargerMemoryBuffer(enabled)
     }
 }

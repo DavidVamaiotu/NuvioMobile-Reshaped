@@ -318,10 +318,12 @@ private fun ExoPlayerSurface(
         sanitizedSourceResponseHeaders,
         useYoutubeChunkedPlayback,
         externalSubtitles,
+        sourceAudioUrl,
     ) {
-        PlaybackSeekCache.wrap( // Nuvio RS: disk read-ahead
+        PlaybackDiskCache.wrap( // Nuvio RS: disk cache (Seek buffer)
             context = context,
             sourceUrl = sourceUrl,
+            audioUrl = sourceAudioUrl,
             cacheable = !useYoutubeChunkedPlayback && !isLoopbackPlaybackSource(sourceUrl),
             upstream = PlatformPlaybackDataSourceFactory.create(
                 context = context,
@@ -336,6 +338,9 @@ private fun ExoPlayerSurface(
     val throughputSampler = remember(sourceUrl) { PlaybackThroughputSampler(sourceUrl) }
     DisposableEffect(throughputSampler) {
         onDispose { throughputSampler.finish() }
+    }
+    DisposableEffect(dataSourceFactory) { // Nuvio RS: disk cache cleared once no player uses it
+        onDispose { PlaybackDiskCache.release(dataSourceFactory) }
     }
 
     fun ExoPlayer.setPlaybackMediaItem(videoMediaItem: MediaItem, startPositionMs: Long? = null) {
@@ -409,7 +414,7 @@ private fun ExoPlayerSurface(
             setParameters(parameters)
         }
 
-        val loadControl = PlaybackBufferAndroid.exoLoadControl() // Nuvio RS: seek buffer setting
+        val loadControl = PlaybackBufferAndroid.exoLoadControl() // Nuvio RS: Seek buffer, Nuvio TV's buffer when chosen
 
         val player = if (useLibass) {
             ExoPlayer.Builder(context)
@@ -527,7 +532,7 @@ private fun ExoPlayerSurface(
         onMimeTypeSelected = { selectedExternalSubtitleMimeType = it },
         onSubtitleDelayChanged = { subtitleDelayMs = it },
         sourceAudioUrl = sourceAudioUrl,
-        dataSourceFactory = PlaybackSeekCache.unwrap(dataSourceFactory), // Nuvio RS: AutoSync reads bypass the read-ahead
+        dataSourceFactory = PlaybackDiskCache.unwrap(dataSourceFactory), // Nuvio RS: AutoSync reads bypass the disk cache
     )
 
     fun syncPlayerViewKeepScreenOn() {
@@ -745,7 +750,6 @@ private fun ExoPlayerSurface(
             lifecycleOwner.lifecycle.removeObserver(observer)
             playerViewRef?.releaseLibassOverlay()
             exoPlayer.releaseWithAssSupportCompat()
-            PlaybackSeekCache.release(sourceUrl) // Nuvio RS: delete the read-ahead file
         }
     }
 
@@ -986,10 +990,11 @@ private fun ExoPlayerSurface(
         while (isActive) {
             throughputSampler.onBytesTick(
                 bytes = networkBytesCounter.getAndSet(0L),
-                // Nuvio RS: read-ahead; a live stream only arrives at its own bitrate, so it says nothing about the network.
+                // Nuvio RS: a live stream only arrives at its own bitrate, so it says nothing about the network.
                 isFetching = !exoPlayer.isCurrentMediaItemLive && exoPlayer.duration != C.TIME_UNSET &&
-                    (PlaybackSeekCache.isDownloading(sourceUrl) ?: exoPlayer.isLoading),
+                    exoPlayer.isLoading,
             )
+            PlaybackDiskCache.onPlayhead(sourceUrl, exoPlayer.currentPosition, exoPlayer.duration) // Nuvio RS: disk cache keeps 1 GB behind
             delay(THROUGHPUT_TICK_MS)
         }
     }
@@ -1382,10 +1387,8 @@ private class NuvioLibmpvView(
         mpv.setOptionString("msg-level", "all=warn")
         mpv.setOptionString("tls-verify", "yes")
         mpv.setOptionString("tls-ca-file", "${context.filesDir.path}/cacert.pem")
-        val (aheadBytes, backBytes) = PlaybackBufferAndroid.mpvCacheBytes() // Nuvio RS: seek buffer setting
-            ?: (libmpvCacheBytes().toLong() to libmpvCacheBytes().toLong())
-        mpv.setOptionString("demuxer-max-bytes", "$aheadBytes").logIfMpvError("demuxer-max-bytes")
-        mpv.setOptionString("demuxer-max-back-bytes", "$backBytes").logIfMpvError("demuxer-max-back-bytes")
+        mpv.setOptionString("demuxer-max-bytes", "${libmpvCacheBytes()}").logIfMpvError("demuxer-max-bytes")
+        mpv.setOptionString("demuxer-max-back-bytes", "${libmpvCacheBytes()}").logIfMpvError("demuxer-max-back-bytes")
         mpv.setOptionString("vd-lavc-film-grain", "cpu")
         mpv.setOptionString("sub-fonts-dir", SubtitleFontStore.fontsDir(context).path)
         mpv.setOptionString("volume-max", LIBMPV_VOLUME_MAX) // Nuvio RS: volume boost
@@ -1869,10 +1872,7 @@ private fun ExoPlayer.snapshot(): PlayerPlaybackSnapshot {
         isEnded = playbackState == Player.STATE_ENDED,
         durationMs = duration.coerceAtLeast(0L),
         positionMs = currentPosition.coerceAtLeast(0L),
-        bufferedPositionMs = PlaybackSeekCache.bufferedPositionMs( // Nuvio RS: disk read-ahead on the bar
-            bufferedPosition.coerceAtLeast(0L),
-            duration.coerceAtLeast(0L),
-        ),
+        bufferedPositionMs = bufferedPosition.coerceAtLeast(0L),
         playbackSpeed = playbackParameters.speed,
         videoWidth = videoWidth,
         videoHeight = videoHeight,
