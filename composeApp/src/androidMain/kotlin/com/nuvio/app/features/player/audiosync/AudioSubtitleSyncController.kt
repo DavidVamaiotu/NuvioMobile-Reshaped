@@ -370,6 +370,10 @@ internal class AudioSubtitleSyncController(
         asr?.clear()
         selectedAudioFormat = null
         provisionalAudioFormat = null
+        // Without a session, a new stream starts out worth listening to; a running session keeps
+        // its verdict on references (same subtitle), while the audio language is judged afresh.
+        if (session == null) noUsableReference = false
+        updateListening()
         stopPool()
         switchedAway.clear()
         handover = null
