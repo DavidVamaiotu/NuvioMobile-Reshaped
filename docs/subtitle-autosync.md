@@ -27,6 +27,8 @@ manually adjusting delay, or leaving playback cancels pending analysis. Index
 requests start only after an add-on subtitle is selected for AutoSync. Applying a
 result swaps sidecar cues without reloading the media source or discarding its buffer.
 
+AutoSync has no debug logging setting and does not emit diagnostic logs.
+
 ## Sources
 
 - Mobile integration and retimer:

@@ -2332,7 +2332,7 @@ internal data class AutoSyncTimelineRetimeResult(
     val localizedMismatchIgnored: Boolean = false,
     /** Median |offset| matched groups still needed after the alignment transform. */
     val medianGroupResidualMs: Double = 0.0,
-    /** Failed confidence gates, for debug logs; null when confident. */
+    /** Failed confidence gates; null when confident. */
     val rejectReason: String? = null,
 )
 

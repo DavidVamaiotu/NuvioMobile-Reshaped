@@ -1,6 +1,5 @@
 package com.nuvio.app.features.autosync
 
-import android.util.Log
 import androidx.media3.common.C
 import androidx.media3.extractor.text.CuesWithTiming
 import com.nuvio.app.features.addons.httpGetTextWithHeaders
@@ -15,7 +14,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToLong
 
-private const val TAG = "NuvioAutoSyncSidecar"
 private const val SIDECAR_WAIT_MS = 15_000L
 private const val SIDECAR_WAIT_POLL_MS = 25L
 private const val BOUNDARY_TOLERANCE_MS = 500L
@@ -78,15 +76,10 @@ internal suspend fun replaceAutoSyncSidecarSubtitle(
         val body = rawBody ?: withContext(Dispatchers.IO) {
             httpGetTextWithHeaders(url = url, headers = headers)
         }
-        if (rawBody != null) {
-            Log.d(TAG, "replacement using AutoSync cached body url=$url")
-        }
-
         val parsed = withContext(Dispatchers.Default) {
             parseSidecarTimedCuesRobust(body, url).cues
         }
         if (parsed.isEmpty()) {
-            Log.w(TAG, "replacement parse empty url=$url; keeping $expectedCurrentUrl")
             return false
         }
 
@@ -96,12 +89,7 @@ internal suspend fun replaceAutoSyncSidecarSubtitle(
         prepared
     } catch (cancel: CancellationException) {
         throw cancel
-    } catch (error: Exception) {
-        Log.w(
-            TAG,
-            "replacement preparation failed url=$url: ${error.message}; " +
-                "keeping $expectedCurrentUrl",
-        )
+    } catch (_: Exception) {
         return false
     }
 
@@ -206,7 +194,6 @@ private fun retimeSidecarTimedCues(
     timeline: AutoSyncTimelineRetimeResult,
 ): List<CuesWithTiming> {
     retimeSidecarTimedCuesByIndexIfCompatible(source, timeline)?.let { direct ->
-        Log.d(TAG, "retime mapped sidecar=${source.size} mapping=direct-index")
         return direct
     }
 
@@ -218,9 +205,6 @@ private fun retimeSidecarTimedCues(
     }
     startBoundaries.sortBy { it.originalMs }
     endBoundaries.sortBy { it.originalMs }
-
-    var boundaryMapped = 0
-    var affineFallback = 0
 
     fun mapTime(originalMs: Long, boundaries: List<TimingBoundary>): Long {
         if (boundaries.isNotEmpty()) {
@@ -246,12 +230,10 @@ private fun retimeSidecarTimedCues(
                 }
             }
             if (best != null && bestError <= BOUNDARY_TOLERANCE_MS) {
-                boundaryMapped++
                 return best.retimedMs.coerceAtLeast(0L)
             }
         }
 
-        affineFallback++
         return (
             originalMs.toDouble() * timeline.alignmentScale +
                 timeline.alignmentInterceptMs
@@ -284,10 +266,5 @@ private fun retimeSidecarTimedCues(
 
     clampIntroducedSidecarOverlaps(source, out)
 
-    Log.d(
-        TAG,
-        "retime mapped sidecar=${source.size} " +
-            "boundaryMapped=$boundaryMapped affineFallback=$affineFallback",
-    )
     return out
 }
