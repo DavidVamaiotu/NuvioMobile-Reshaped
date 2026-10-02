@@ -558,6 +558,7 @@
     <string name="settings_poster_custom">Niestandardowy</string>
     <string name="settings_poster_description">Dostosuj szerokość i zaokrąglenie rogów kart plakatów w całej aplikacji.</string>
     <string name="settings_poster_hide_labels">Ukryj etykiety</string>
+    <string name="settings_poster_always_show_landscape_clearlogo">Zawsze tło z logo dla poziomych plakatów</string>
     <string name="settings_poster_landscape_mode">Tryb poziomy dla plakatów na półce</string>
     <string name="settings_poster_live_preview">Podgląd na żywo</string>
     <string name="settings_poster_option_with_value">%1$s (%2$s)</string>
