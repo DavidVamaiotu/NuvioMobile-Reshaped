@@ -1,3 +1,4 @@
-- **Sync with Google.** Settings > Nuvio Reshaped > Sync keeps Reshaped settings and Live TV (your source and its login, favourites, last channel) the same on your phone and TVs. Both switches are off until you turn them on, and the data stays in one file in your own Google Drive.
-- **Faster, steadier seeking.** Rapid seeks cancel the stale connection instead of waiting for it.
-- **Better styled subtitles** and a refined glass effect on the AutoSync bubble.
+- **More efficient AutoSync.** It gets more useful information from each sampled spot, skips recognition work that cannot help, re-evaluates listening when the stream changes, and counts each place in the film only once when voting on words.
+- **Simpler, steadier buffering.** The old Reshaped seek read-ahead is replaced by Nuvio's disk cache and ExoPlayer buffer.
+- **Lighter AutoSync bubble.** The video copy stays pinned in place and refreshes at up to 30 fps only while words are visible, reducing unnecessary rendering work.
+- **Updated to official Nuvio 0.5.5-beta.** Reshaped features are preserved on the new upstream base.
