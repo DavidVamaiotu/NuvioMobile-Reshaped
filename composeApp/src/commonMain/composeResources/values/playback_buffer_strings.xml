@@ -4,7 +4,9 @@
     <string name="settings_playback_buffer_section">Playback</string>
     <string name="settings_playback_buffer_title">Seek buffer: %1$s</string>
     <string name="settings_playback_buffer_default">Nuvio default</string>
-    <string name="settings_playback_buffer_value_mb">%1$d MB</string>
+    <string name="settings_playback_buffer_auto">Auto</string>
     <string name="settings_playback_buffer_value_gb">%1$d GB</string>
-    <string name="settings_playback_buffer_description">How much of what comes next is loaded ahead, so jumps inside it are instant. ExoPlayer keeps it in a temporary file, libmpv in memory; nothing already watched is kept. Capped to what this device can hold. Tap to change; applies from the next playback.</string>
+    <string name="settings_playback_buffer_description">Keeps what you have watched in a disk cache, like Nuvio TV, so jumping back is instant. Auto sizes it from free storage. It is cleared when playback ends. Tap to change; applies from the next playback.</string>
+    <string name="settings_playback_memory_buffer_title">Larger memory buffer</string>
+    <string name="settings_playback_memory_buffer_description">Uses Nuvio TV\'s ExoPlayer buffer: up to 45 s ahead, sized from this phone\'s memory. Applies from the next playback.</string>
 </resources>
