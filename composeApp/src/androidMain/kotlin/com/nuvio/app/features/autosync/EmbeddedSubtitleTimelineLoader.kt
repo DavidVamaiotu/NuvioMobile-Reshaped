@@ -43,6 +43,9 @@ import kotlin.math.max
 @OptIn(UnstableApi::class)
 internal object EmbeddedSubtitleTimelineLoader {
     private const val TOTAL_TIMEOUT_MS = 7_000L
+    // Range requests stop on their own at TOTAL_TIMEOUT_MS. This outer cap only guards a hang:
+    // parsing that has already downloaded everything must not be thrown away on a busy device.
+    private const val HARD_TIMEOUT_MS = 20_000L
     private const val INITIAL_PROBE_BYTES = 512 * 1024
     private const val HEADER_PROBE_BYTES = 64
     private const val TAIL_PROBE_BYTES = 4 * 1024 * 1024
@@ -191,7 +194,7 @@ internal object EmbeddedSubtitleTimelineLoader {
     ): IndexedEmbeddedTimeline? {
         return try {
             val loaded = try {
-                withTimeout(TOTAL_TIMEOUT_MS) {
+                withTimeout(HARD_TIMEOUT_MS) {
                     withContext(Dispatchers.IO) {
                         loadMatroskaCueIndex(sourceUrl, sourceHeaders)
                     }
