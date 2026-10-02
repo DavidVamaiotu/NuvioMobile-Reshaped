@@ -114,6 +114,14 @@ internal class AudioSubtitleSyncController(
     @Volatile
     private var recognizerFailed = false
 
+    /** No recogniser for this playback: the model is missing and can't be fetched, or failed. */
+    @Volatile
+    private var recognizerUnavailable = false
+
+    /** The session's subtitle has no English reference the heard words could be matched against. */
+    @Volatile
+    private var noUsableReference = false
+
     @Volatile
     private var recognizerReady = "ready"
 
@@ -302,7 +310,7 @@ internal class AudioSubtitleSyncController(
         }
         val speechModel = SubtitleSyncStatus.speechModel.value
         // A model downloaded from Settings mid-playback is picked up here.
-        if (recognizer == null && speechModel.downloaded) ensureRecognizer()
+        if (recognizer == null && speechModel.downloaded && !audioIsForeign()) ensureRecognizer()
         val recognizerText = when {
             recognizer != null -> recognizerReady
             speechModel.downloading -> "downloading model ${(speechModel.progress * 100).toInt()}%"
@@ -325,7 +333,7 @@ internal class AudioSubtitleSyncController(
             liveOnly = liveOnly,
             wordsHeard = asr?.heardWordCount ?: 0,
             recognizer = recognizerText,
-            reference = referenceStatus,
+            reference = if (audioIsForeign()) "not used (audio is not English)" else referenceStatus,
             alternatives = pool?.summary.orEmpty(),
             rate = synced?.segments?.last()?.scale?.takeIf { kotlin.math.abs(it - 1.0) > 1e-6 }
                 ?.let { "subtitle stretched ×${"%.4f".format(java.util.Locale.US, it)}" },
@@ -362,6 +370,10 @@ internal class AudioSubtitleSyncController(
         asr?.clear()
         selectedAudioFormat = null
         provisionalAudioFormat = null
+        // Without a session, a new stream starts out worth listening to; a running session keeps
+        // its verdict on references (same subtitle), while the audio language is judged afresh.
+        if (session == null) noUsableReference = false
+        updateListening()
         stopPool()
         switchedAway.clear()
         handover = null
@@ -431,12 +443,15 @@ internal class AudioSubtitleSyncController(
         val weights = runCatching { loadWeights(appContext) }.getOrNull() ?: return
         createDecoder()
         // One decoder per worker: each reads a different place, so their audio must not mix.
+        val segmenters = ArrayList<SpeechSegmenter>()
         val decoders = List(SPOT_WORKERS) {
             val analyzer = SpeechAnalyzer(SileroVad(weights), timeline)
             asr?.let { engine ->
-                analyzer.chunkListener = SpeechSegmenter { startFrame, samples ->
+                val segmenter = SpeechSegmenter { startFrame, samples ->
                     engine.offerSegment(startFrame, samples, spread = true)
                 }
+                segmenters += segmenter
+                analyzer.chunkListener = segmenter
             }
             AudioSyncDecoder(analyzer, analyzer, allowVendorDecoders = false)
         }
@@ -473,6 +488,8 @@ internal class AudioSubtitleSyncController(
             SyncLog.i("sampled ${result.sampled} spots, ${result.bytes / 1_000_000} MB, failure=${result.failure}")
             if (result.failure != null && result.sampled == 0) spotStatus = "not possible for this stream"
             decoders.forEach { it.awaitDrained(DRAIN_TIMEOUT_MS) }
+            // The last spot of each connection ends mid-speech more often than not.
+            segmenters.forEach(SpeechSegmenter::flush)
         } catch (error: Throwable) {
             SyncLog.w("audio sampling failed: ${error.message}")
         } finally {
@@ -504,6 +521,23 @@ internal class AudioSubtitleSyncController(
         if (format == null || selectedAudioFormat?.let { matches(it, format) } == true) return
         selectedAudioFormat = format
         SyncLog.d("audio track selected: ${describe(format)}")
+        updateListening()
+        if (session != null && enabled && !audioIsForeign()) ensureRecognizer()
+    }
+
+    /**
+     * True only when the playing audio is tagged with a language other than English: the speech
+     * model understands English only. Untagged audio is assumed to be English.
+     */
+    private fun audioIsForeign(): Boolean {
+        val language = (selectedAudioFormat ?: provisionalAudioFormat)?.language?.trim()?.lowercase()
+        if (language.isNullOrEmpty() || language in UNKNOWN_LANGUAGES) return false
+        return !isEnglish(language)
+    }
+
+    /** Keeps speech for recognition only while recognition can help (see [AsrSyncEngine.setListening]). */
+    private fun updateListening() {
+        asr?.setListening(!recognizerUnavailable && !noUsableReference && !audioIsForeign())
     }
 
     /**
@@ -602,7 +636,7 @@ internal class AudioSubtitleSyncController(
     fun setReferenceSubtitles(list: List<ReferenceCandidate>) {
         candidates = list
         // Load the speech model while the viewer is still choosing, so it is ready for the pick.
-        if (enabled && list.isNotEmpty() && AsrModel.isReady(appContext)) ensureRecognizer()
+        if (enabled && list.isNotEmpty() && AsrModel.isReady(appContext) && !audioIsForeign()) ensureRecognizer()
         // Download the likeliest English references now so a later pick is instant.
         englishCandidates().take(PREFETCH_REFERENCES).forEach { fetchReference(it, onReady = null) }
         // Subtitles listed after the pick join the running search.
@@ -811,7 +845,11 @@ internal class AudioSubtitleSyncController(
      */
     private fun startRecognition(current: Session) {
         val engine = asr ?: return
-        ensureRecognizer()
+        noUsableReference = false
+        updateListening()
+        // The speech model understands English only: it is not loaded for foreign-language audio
+        // (it is if the audio track changes to English, see [onAudioTrackSelected]).
+        if (!audioIsForeign()) ensureRecognizer()
         val english = isEnglish(candidates.firstOrNull { it.url == current.key }?.language) ||
             looksEnglish(current.dialogue)
         if (english) {
@@ -830,6 +868,8 @@ internal class AudioSubtitleSyncController(
             SyncLog.i("no English reference subtitle available; recognition idle")
             referenceStatus = "none available"
             problem = "No English subtitle found for this title, using speech detection (slower)"
+            noUsableReference = true
+            updateListening()
             return
         }
         bridgeReferences(current, engine)
@@ -840,6 +880,8 @@ internal class AudioSubtitleSyncController(
         if (references.isEmpty()) {
             referenceStatus = "none available"
             problem = "No English subtitle found for this title, using speech detection (slower)"
+            noUsableReference = true
+            updateListening()
             return
         }
         problem = null
@@ -856,6 +898,10 @@ internal class AudioSubtitleSyncController(
                 if (bridge != null) {
                     matched.incrementAndGet()
                     engine.addReference(ReferenceSubtitle(candidate.url, dialogue, bridge))
+                    if (noUsableReference) {
+                        noUsableReference = false
+                        updateListening()
+                    }
                 }
                 val done = finished.incrementAndGet()
                 referenceStatus = when {
@@ -865,6 +911,8 @@ internal class AudioSubtitleSyncController(
                 }
                 if (done == references.size && matched.get() == 0) {
                     problem = "English subtitles don't line up with yours (different release?), using speech detection"
+                    noUsableReference = true
+                    updateListening()
                 }
             }
         }
@@ -876,16 +924,22 @@ internal class AudioSubtitleSyncController(
         try {
             fetchPool.execute {
                 try {
+                    recognizerUnavailable = false
+                    updateListening()
                     if (!AsrModel.isReady(appContext)) {
                         if (!AsrModel.isUnmetered(appContext)) {
                             recognizerStatus = "model not downloaded (Settings › Playback)"
                             notify(AudioSyncStatus.ModelNeedsWifi(AsrModel.DOWNLOAD_MB))
+                            recognizerUnavailable = true
+                            updateListening()
                             return@execute
                         }
                         notify(AudioSyncStatus.ModelDownloading(AsrModel.DOWNLOAD_MB))
                         if (!AsrModel.download(appContext)) {
                             SyncLog.w("speech model download failed; using speech detection only")
                             recognizerStatus = "model download failed"
+                            recognizerUnavailable = true
+                            updateListening()
                             return@execute
                         }
                     }
@@ -906,6 +960,8 @@ internal class AudioSubtitleSyncController(
                     SyncLog.w("speech recognizer unavailable: ${error.message}")
                     recognizerStatus = "failed to load (${error.message ?: error.javaClass.simpleName})"
                     recognizerFailed = true
+                    recognizerUnavailable = true
+                    updateListening()
                 } finally {
                     recognizerLoading.set(false)
                 }
@@ -1199,6 +1255,9 @@ internal class AudioSubtitleSyncController(
         private val NEAR_PLAYHEAD_FRAMES = (5_000 / SpeechTimeline.FRAME_DURATION_MS).toInt()
         private const val OPEN_SUBTITLES_FALLBACK = "https://opensubtitles-v3.strem.io"
         private const val RECOGNIZER_THREADS = 2
+
+        /** Language tags that say nothing about the language spoken. */
+        private val UNKNOWN_LANGUAGES = setOf("und", "mul", "zxx", "mis", "unknown")
         private const val NOTIFY_CHANGE_MS = 1_000L
         /** 10 minutes of audio analysed before any subtitle is chosen. */
         private val PRE_SESSION_FRAMES = (10 * 60 * 1_000 / SpeechTimeline.FRAME_DURATION_MS).toInt()

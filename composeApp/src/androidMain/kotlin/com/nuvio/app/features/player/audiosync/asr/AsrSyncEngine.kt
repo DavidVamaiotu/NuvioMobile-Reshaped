@@ -121,6 +121,10 @@ internal class AsrSyncEngine(
     private var released = false
     private var worker: Thread? = null
 
+    /** False while recognition cannot help (no recogniser, no usable reference, foreign audio). */
+    @Volatile
+    private var listening = true
+
     /** Heard words so far; exposed for diagnostics. */
     val heardWordCount: Int get() = synchronized(lock) { heard.size }
 
@@ -130,6 +134,22 @@ internal class AsrSyncEngine(
     fun setRecognizer(recognizer: SpeechToText?) {
         stt = recognizer
         synchronized(lock) { lock.notifyAll() }
+    }
+
+    /**
+     * Whether speech is worth keeping for recognition. Off, nothing is queued (queued speech is
+     * dropped), so a stream that can never be recognised holds no audio; words already heard stay.
+     */
+    fun setListening(on: Boolean) {
+        synchronized(lock) {
+            if (listening == on) return
+            listening = on
+            if (!on) {
+                queue.clear()
+                queuedSamples = 0
+            }
+            lock.notifyAll()
+        }
     }
 
     fun onPlayhead(positionMs: Long) {
@@ -143,7 +163,7 @@ internal class AsrSyncEngine(
     fun offerSegment(startFrame: Int, samples: FloatArray, spread: Boolean = false) {
         val segment = Segment(startFrame, samples, spread)
         synchronized(lock) {
-            if (released) return
+            if (released || !listening) return
             val range = segment.startFrame until segment.endFrame
             // The look-ahead and live paths can deliver the same stretch; skip what is mostly known.
             val overlap = covered.sumOf { overlap(it, range) } + queue.sumOf { overlap(it.startFrame until it.endFrame, range) }
@@ -177,6 +197,7 @@ internal class AsrSyncEngine(
         synchronized(lock) {
             if (references.any { it.key == reference.key }) return
             references = references + reference
+            lock.notifyAll()
         }
         evaluate()
     }
@@ -245,7 +266,8 @@ internal class AsrSyncEngine(
         runCatching(workerSetup)
         while (true) {
             val (segment, recognizer) = synchronized(lock) {
-                while (!released && (queue.isEmpty() || stt == null || target == null)) lock.wait()
+                // Nothing to match words against yet: recognising now would be wasted work.
+                while (!released && (queue.isEmpty() || stt == null || target == null || references.isEmpty())) lock.wait()
                 if (released) return
                 nextSegment().also { queuedSamples -= it.samples.size } to stt!!
             }
@@ -306,7 +328,8 @@ internal class AsrSyncEngine(
         } else {
             mostLikelyRate(targetTrack, words, fit, bridge)
         }
-        val shiftMs = fine?.shiftMs ?: coarseShiftMs
+        val trustedFine = fine?.takeIf { isTrustedMove(it, coarseShiftMs) }
+        val shiftMs = trustedFine?.shiftMs ?: coarseShiftMs
         val segments = piecewise(targetTrack, words, reference, fit, scale, shiftMs)
             ?: listOf(SubtitleSyncSegment(0L, scale, shiftMs))
         val result = AsrLock(
@@ -314,7 +337,7 @@ internal class AsrSyncEngine(
             shiftMs = segments.first().shiftMs,
             referenceKey = reference.key,
             anchorScore = fit.score,
-            fineTuned = fine != null,
+            fineTuned = trustedFine != null,
             final = rateKnown || locked,
             segments = segments,
         )
@@ -361,18 +384,39 @@ internal class AsrSyncEngine(
         scale: Double,
         shiftMs: Double,
     ): List<SubtitleSyncSegment>? {
-        val locals = reference.matcher.localFits(words, fit.scale)
-        if (locals.isEmpty()) return null
+        val confidentLocals = reference.matcher.localFits(words, fit.scale)
+        if (confidentLocals.isEmpty()) return null
         val bridgeScale = reference.bridge?.scale ?: 1.0
 
-        // Target -> media shift each region implies at the chosen scale, through its anchor. The
-        // target is placed against the reference by the lines around there, not the whole file.
-        val targetShifts = locals.associateWith { local ->
+        // Target -> media shift a fit implies at the chosen scale, through its anchor. The target
+        // is placed against the reference by the lines around there, not the whole file.
+        fun impliedShiftMs(local: AnchorFit): Double {
             val referenceSec = (local.anchorSec - local.shiftSec) / local.scale
             val targetSec = (referenceSec - reference.bridgeShiftSecAt(track, referenceSec)) / bridgeScale
-            (local.anchorSec - scale * targetSec) * 1_000.0
+            return (local.anchorSec - scale * targetSec) * 1_000.0
         }
+        // Words from several far-apart places (short sampled spots) can agree on an offset while
+        // few of the places are confident alone. That agreement is a part of its own, over the
+        // stretch its words come from (standing for the confident regions there that agree with
+        // it); otherwise one strong region (say the opening, heard in full) would decide the whole
+        // film. Not when a confident region inside that stretch says otherwise.
+        val spread = reference.matcher.fitByPlace(words, fit.scale)?.takeIf { spread ->
+            val shift = impliedShiftMs(spread)
+            spread.segments >= MIN_PART_SEGMENTS && spread.spanSec >= SPREAD_MIN_SPAN_SEC &&
+                confidentLocals.none {
+                    it.anchorSec in spread.firstSec..spread.lastSec && abs(impliedShiftMs(it) - shift) > STEP_TOLERANCE_MS
+                }
+        }
+        val locals = if (spread == null) {
+            confidentLocals
+        } else {
+            (confidentLocals.filter { it.anchorSec !in spread.firstSec..spread.lastSec } + spread).sortedBy { it.anchorSec }
+        }
+        val targetShifts = locals.associateWith(::impliedShiftMs)
         fun targetShiftMs(local: AnchorFit): Double = targetShifts.getValue(local)
+        // Where a part's words begin and end: a region's anchor, or the spread agreement's extent.
+        fun startSec(local: AnchorFit): Double = if (local === spread) local.firstSec else local.anchorSec
+        fun endSec(local: AnchorFit): Double = if (local === spread) local.lastSec else local.anchorSec
 
         class Part(val fits: MutableList<AnchorFit>, var shiftMs: Double)
         val parts = ArrayList<Part>()
@@ -394,16 +438,17 @@ internal class AsrSyncEngine(
         if (parts.size == 1 && abs(parts[0].shiftMs - shiftMs) <= STEP_TOLERANCE_MS) return null
         val frameMs = SpeechTimeline.FRAME_DURATION_MS
         val tuned = parts.map { part ->
-            val fromFrame = ((part.fits.first().anchorSec - PART_CONTEXT_SEC) * 1_000 / frameMs).toInt().coerceAtLeast(0)
-            val toFrame = ((part.fits.last().anchorSec + PART_CONTEXT_SEC) * 1_000 / frameMs).toInt()
-            fineTune(track, scale, part.shiftMs, fromFrame, toFrame)?.shiftMs ?: part.shiftMs
+            val fromFrame = ((startSec(part.fits.first()) - PART_CONTEXT_SEC) * 1_000 / frameMs).toInt().coerceAtLeast(0)
+            val toFrame = ((endSec(part.fits.last()) + PART_CONTEXT_SEC) * 1_000 / frameMs).toInt()
+            fineTune(track, scale, part.shiftMs, fromFrame, toFrame)
+                ?.takeIf { isTrustedMove(it, part.shiftMs) }?.shiftMs ?: part.shiftMs
         }
         val segments = ArrayList<SubtitleSyncSegment>()
         segments += SubtitleSyncSegment(0L, scale, tuned.first())
         for (i in 1 until parts.size) {
             if (abs(tuned[i] - segments.last().shiftMs) <= STEP_TOLERANCE_MS) continue
-            val afterMs = parts[i - 1].fits.last().anchorSec * 1_000
-            val beforeMs = parts[i].fits.first().anchorSec * 1_000
+            val afterMs = endSec(parts[i - 1].fits.last()) * 1_000
+            val beforeMs = startSec(parts[i].fits.first()) * 1_000
             val split = AudioSyncTracker.changePoint(
                 timeline = timeline,
                 track = track,
@@ -495,6 +540,16 @@ internal class AsrSyncEngine(
         return estimate
     }
 
+    /**
+     * Whether a fine-tune estimate may move the word-based offset [coarseShiftMs]. Moves within the
+     * words' own timing uncertainty are taken as before; a larger one needs a peak that stands out,
+     * since a flat speech pattern (dense dialogue, music) could otherwise pull a good word-based
+     * offset by up to [FINE_TUNE_MAX_MOVE_MS].
+     */
+    private fun isTrustedMove(estimate: SubtitleAudioAligner.Estimate, coarseShiftMs: Double): Boolean =
+        abs(estimate.shiftMs - coarseShiftMs) <= FINE_TUNE_FREE_MOVE_MS ||
+            estimate.prominence >= FINE_TUNE_MIN_PROMINENCE
+
     private fun overlap(a: IntRange, b: IntRange): Int =
         (minOf(a.last, b.last) - maxOf(a.first, b.first) + 1).coerceAtLeast(0)
 
@@ -509,6 +564,12 @@ internal class AsrSyncEngine(
         private const val FINE_TUNE_WINDOW_MS = 3_000.0
         private const val FINE_TUNE_MAX_MOVE_MS = 1_200.0
         private const val FINE_TUNE_MIN_CUES = 5
+
+        /** Fine-tune moves up to this need no clear peak: about how far off a word's time can be. */
+        private const val FINE_TUNE_FREE_MOVE_MS = 500.0
+
+        /** Peak lead over any offset more than 2.5 s away that a larger move needs. */
+        private const val FINE_TUNE_MIN_PROMINENCE = 0.05
         private const val FINAL_SPAN_SEC = 180.0
 
         /** Correlation a stretched mapping must win by over the unstretched one. */
@@ -535,6 +596,9 @@ internal class AsrSyncEngine(
 
         /** Audio around a part's words used to fine-tune its offset. */
         private const val PART_CONTEXT_SEC = 150.0
+
+        /** Agreement between places counts as a part only when its words span this much of the film. */
+        private const val SPREAD_MIN_SPAN_SEC = 180.0
         private const val CHANGE_POINT_TOLERANCE_MS = 5_000L
 
         /** After syncing, speech up to this far ahead of the playhead is still recognised (3 min). */

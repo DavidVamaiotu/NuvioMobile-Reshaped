@@ -15,6 +15,9 @@ internal data class AnchorFit(
     val spanSec: Double,
     /** Media time (median) of the agreeing words: where [shiftSec] holds exactly. */
     val anchorSec: Double = 0.0,
+    /** Media time of the first and last agreeing word. */
+    val firstSec: Double = anchorSec,
+    val lastSec: Double = anchorSec,
 ) {
     val isConfident: Boolean
         get() = segments >= MIN_SEGMENTS && score >= MIN_SCORE && score >= RATIO * maxOf(runnerUp, 0.5)
@@ -60,18 +63,35 @@ internal class WordAnchorMatcher(cues: List<Triple<Long, Long, String>>) {
     fun fit(heard: List<HeardWord>, maxShiftSec: Double = MAX_SHIFT_SEC): AnchorFit? {
         val anchors = anchors(heard)
         if (anchors.isEmpty()) return null
-        val unit = cluster(anchors, 1.0, maxShiftSec) ?: return null
+        val unit = cluster(anchors, 1.0, maxShiftSec)
         val span = anchors.maxOf { it.mediaSec } - anchors.minOf { it.mediaSec }
         // Over a short stretch every frame rate fits equally well; judge the rate only on a long span.
         if (span < MIN_RATE_SPAN_SEC) return unit
+        // Other rates are tried even when no word fits at 1x: late in a film a frame-rate mismatch
+        // can put every word further than [maxShiftSec] off at 1x, exactly when a rate is needed.
+        val unitScore = unit?.score ?: 0.0
         var best = unit
         for (scale in RATE_CANDIDATES) {
             val fit = cluster(anchors, scale, maxShiftSec) ?: continue
             // A rate change drifts further every minute: it needs words from several places.
             if (fit.segments < MIN_RATE_SEGMENTS) continue
-            if (fit.score > best.score * RATE_MARGIN && fit.score > unit.score * RATE_MARGIN) best = fit
+            if (fit.score > (best?.score ?: 0.0) * RATE_MARGIN && fit.score > unitScore * RATE_MARGIN) best = fit
         }
-        return best
+        if (best !== unit) return best
+        // Counted word by word, the stretch heard most (around the playhead, often the opening)
+        // decides: there every rate fits, so its words agree at 1x however wrong 1x is elsewhere.
+        // Counted place by place instead (each part of the film a capped vote), a rate that words
+        // from several far-apart places agree on can still be seen.
+        val unitByPlace = cluster(anchors, 1.0, maxShiftSec, PLACE_CAP)
+        var byPlace: AnchorFit? = null
+        for (scale in RATE_CANDIDATES) {
+            val fit = cluster(anchors, scale, maxShiftSec, PLACE_CAP) ?: continue
+            if (fit.segments < MIN_RATE_SEGMENTS || fit.spanSec < MIN_RATE_SPAN_SEC || !fit.isConfident) continue
+            if (fit.score > (byPlace?.score ?: 0.0) * RATE_MARGIN && fit.score > (unitByPlace?.score ?: 0.0) * RATE_MARGIN) {
+                byPlace = fit
+            }
+        }
+        return byPlace ?: unit
     }
 
     /**
@@ -86,6 +106,16 @@ internal class WordAnchorMatcher(cues: List<Triple<Long, Long, String>>) {
             .values
             .mapNotNull { region -> cluster(region, scale, MAX_SHIFT_SEC)?.takeIf { it.isConfident } }
             .sortedBy { it.anchorSec }
+    }
+
+    /**
+     * The confident fit at [scale] with places counted, not words (see [cluster]): what words
+     * from several parts of the film agree on, even when one part was heard far more than the rest.
+     */
+    fun fitByPlace(heard: List<HeardWord>, scale: Double): AnchorFit? {
+        val anchors = anchors(heard)
+        if (anchors.isEmpty()) return null
+        return cluster(anchors, scale, MAX_SHIFT_SEC, PLACE_CAP)?.takeIf { it.isConfident }
     }
 
     private fun anchors(heard: List<HeardWord>): List<Anchor> {
@@ -110,7 +140,24 @@ internal class WordAnchorMatcher(cues: List<Triple<Long, Long, String>>) {
         return out
     }
 
-    private fun cluster(anchors: List<Anchor>, scale: Double, maxShiftSec: Double): AnchorFit? {
+    /**
+     * The tightest, best-supported group of votes at [scale]. With [placeCap], the words of each
+     * [LOCAL_WINDOW_SEC] of the film count for at most that much together, so agreement between
+     * places outweighs many words from one place.
+     */
+    private fun cluster(
+        anchors: List<Anchor>,
+        scale: Double,
+        maxShiftSec: Double,
+        placeCap: Double = Double.POSITIVE_INFINITY,
+    ): AnchorFit? {
+        val perPlace = HashMap<Int, Double>()
+        fun weight(window: List<Pair<Anchor, Double>>): Double {
+            if (placeCap.isInfinite()) return window.sumOf { it.first.weight }
+            perPlace.clear()
+            for ((anchor, _) in window) perPlace.merge((anchor.mediaSec / LOCAL_WINDOW_SEC).toInt(), anchor.weight, Double::plus)
+            return perPlace.values.sumOf { minOf(it, placeCap) }
+        }
         val entries = anchors
             .map { it to (it.mediaSec - scale * it.subSec) }
             .filter { abs(it.second) <= maxShiftSec }
@@ -125,7 +172,7 @@ internal class WordAnchorMatcher(cues: List<Triple<Long, Long, String>>) {
             while (entries[to].second - entries[from].second > WINDOW_SEC) from++
             val window = entries.subList(from, to + 1)
             val segments = window.map { it.first.segment }.toSet().size
-            val score = window.sumOf { it.first.weight } * minOf(segments, 6) / 6.0
+            val score = weight(window) * minOf(segments, 6) / 6.0
             if (score > bestScore) {
                 bestScore = score
                 bestFrom = from
@@ -142,7 +189,7 @@ internal class WordAnchorMatcher(cues: List<Triple<Long, Long, String>>) {
         var f = 0
         for (t in far.indices) {
             while (far[t].second - far[f].second > WINDOW_SEC) f++
-            runnerUp = maxOf(runnerUp, far.subList(f, t + 1).sumOf { it.first.weight })
+            runnerUp = maxOf(runnerUp, weight(far.subList(f, t + 1)))
         }
         val times = inCluster.map { it.first.mediaSec }
         return AnchorFit(
@@ -153,6 +200,8 @@ internal class WordAnchorMatcher(cues: List<Triple<Long, Long, String>>) {
             runnerUp = runnerUp,
             spanSec = times.max() - times.min(),
             anchorSec = median(times),
+            firstSec = times.min(),
+            lastSec = times.max(),
         )
     }
 
@@ -164,6 +213,9 @@ internal class WordAnchorMatcher(cues: List<Triple<Long, Long, String>>) {
         private const val MIN_RATE_SEGMENTS = 5
         private const val LOCAL_WINDOW_SEC = 120.0
         private const val RATE_MARGIN = 1.3
+
+        /** Most one place (see [LOCAL_WINDOW_SEC]) adds when places are counted: a few matched words. */
+        private const val PLACE_CAP = 1.5
         private val RATE_CANDIDATES = doubleArrayOf(
             24_000.0 / 23_976.0,
             23_976.0 / 24_000.0,
