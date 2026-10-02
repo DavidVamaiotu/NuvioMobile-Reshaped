@@ -109,16 +109,15 @@ private class BubbleGlassPainter : BubbleBackdropPainter {
         return created
     }
 
-    override fun DrawScope.paint(frame: BubbleBackdropFrame, bubble: Rect, corner: Float) {
+    override fun DrawScope.paint(frame: BubbleBackdropFrame, copied: Rect, corner: Float, alpha: Float) {
         val image = frame.image.asAndroidBitmap()
-        val copied = frame.windowRect
         if (copied.width <= 0f || copied.height <= 0f) return
         shader.setInputShader("backdrop", shaderFor(image))
         shader.setFloatUniform("resolution", size.width, size.height)
         shader.setFloatUniform("density", density)
         shader.setFloatUniform("corner", corner)
-        shader.setFloatUniform("origin", copied.left - bubble.left, copied.top - bubble.top)
+        shader.setFloatUniform("origin", copied.left, copied.top)
         shader.setFloatUniform("scale", image.width / copied.width, image.height / copied.height)
-        drawRect(brush)
+        drawRect(brush, alpha = alpha)
     }
 }

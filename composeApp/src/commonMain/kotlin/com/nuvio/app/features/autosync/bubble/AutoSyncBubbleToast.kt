@@ -76,6 +76,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -92,6 +93,9 @@ private val SyncedGreen = Color(0xFF30D158)
 private val FailedRed = Color(0xFFFF453A)
 private val GlassBody = Color(0xFF2A2A2E)
 private val BubbleCorner = 23.dp
+/** The point the bubble scales around, as a fraction of its size. */
+private const val BubblePivotX = 0.5f
+private const val BubblePivotY = 0.6f
 private val OrbSize = 30.dp
 /** How much video around the bubble is copied, so the edges have something to bend in. */
 private val BackdropMargin = 12.dp
@@ -224,31 +228,65 @@ private fun AutoSyncBubble(message: AutoSyncBubbleMessage, modifier: Modifier) {
     val backdrop = AutoSyncBubbleBackdrop.sampler?.invoke(bounds, with(LocalDensity.current) { BackdropMargin.toPx() })
     val backdropPainter = AutoSyncBubbleBackdrop.painter?.invoke()
     val backdropPath = remember { Path() }
-    // About 16 copies a second while the words show; 5 once it has settled to just the droplet.
-    SideEffect { bounds.sampleIntervalMs = if (labelVisible || cardOpen) 60L else 200L }
     val innerPath = remember { Path() }
+    val layer = remember { BubbleLayer() }
+    // The video only shows through while words or the card are up; the droplet alone is plain
+    // frosted glass, so nothing is copied while it waits.
+    val videoShown = labelVisible || cardOpen
+    val videoMix = animateFloatAsState(
+        targetValue = if (videoShown) 1f else 0f,
+        animationSpec = tween(320),
+    )
+    SideEffect { bounds.sampling.value = videoShown || videoMix.value > 0f }
+
+    fun Density.bubbleLayer(): BubbleLayer {
+        val a = appear.value
+        val l = leave.value
+        val m = melt.value
+        val liquid = 1f - settle.value
+        val t = clock.floatValue
+        // Melting away: a touch wider and shorter as it draws in, like a drop settling.
+        val squash = 0.04f * sin(m * PI.toFloat())
+        val scale = (0.72f + 0.28f * a) * (1f - 0.25f * l) * (1f - 0.5f * m)
+        layer.scaleX = scale * (1f + squash)
+        layer.scaleY = scale * (1f - squash)
+        // While it works, the whole bubble drifts a little, as if floating.
+        val wobble = sin(shake.value * PI.toFloat() * 3f) * (1f - shake.value) * 2.dp.toPx()
+        layer.translationX = sin(t * 1.1f) * 0.8.dp.toPx() * liquid + wobble
+        layer.translationY = (1f - a) * 20.dp.toPx() + (l + m * 0.5f) * 10.dp.toPx() +
+            sin(t * 1.6f + 0.8f) * 0.6.dp.toPx() * liquid
+        return layer
+    }
+
+    /**
+     * Where the copied video lies in the bubble's own (animated) coordinates: the bubble's float,
+     * pop and melt are undone, so the copy stays pinned over the video it was taken from.
+     */
+    fun DrawScope.localCopyRect(frame: BubbleBackdropFrame, bubble: Rect): Rect {
+        val moved = bubbleLayer()
+        val pivotX = size.width * BubblePivotX
+        val pivotY = size.height * BubblePivotY
+        fun x(windowX: Float) = pivotX + (windowX - bubble.left - pivotX - moved.translationX) / moved.scaleX
+        fun y(windowY: Float) = pivotY + (windowY - bubble.top - pivotY - moved.translationY) / moved.scaleY
+        return Rect(
+            left = x(frame.windowRect.left),
+            top = y(frame.windowRect.top),
+            right = x(frame.windowRect.right),
+            bottom = y(frame.windowRect.bottom),
+        )
+    }
 
     Box(
         modifier = modifier
             .onGloballyPositioned { bounds.rect = it.boundsInWindow() }
             .graphicsLayer {
-                val a = appear.value
-                val l = leave.value
-                val m = melt.value
-                val liquid = 1f - settle.value
-                val t = clock.floatValue
-                // Melting away: a touch wider and shorter as it draws in, like a drop settling.
-                val squash = 0.04f * sin(m * PI.toFloat())
-                val scale = (0.72f + 0.28f * a) * (1f - 0.25f * l) * (1f - 0.5f * m)
-                scaleX = scale * (1f + squash)
-                scaleY = scale * (1f - squash)
-                alpha = a.coerceIn(0f, 1f) * (1f - l) * (1f - m)
-                // While it works, the whole bubble drifts a little, as if floating.
-                val wobble = sin(shake.value * PI.toFloat() * 3f) * (1f - shake.value) * 2.dp.toPx()
-                translationX = sin(t * 1.1f) * 0.8.dp.toPx() * liquid + wobble
-                translationY = (1f - a) * 20.dp.toPx() + (l + m * 0.5f) * 10.dp.toPx() +
-                    sin(t * 1.6f + 0.8f) * 0.6.dp.toPx() * liquid
-                transformOrigin = TransformOrigin(0.5f, 0.6f)
+                val bubble = bubbleLayer()
+                scaleX = bubble.scaleX
+                scaleY = bubble.scaleY
+                translationX = bubble.translationX
+                translationY = bubble.translationY
+                alpha = appear.value.coerceIn(0f, 1f) * (1f - leave.value) * (1f - melt.value)
+                transformOrigin = TransformOrigin(BubblePivotX, BubblePivotY)
             }
             .then(
                 if (cardOpen) {
@@ -267,6 +305,8 @@ private fun AutoSyncBubble(message: AutoSyncBubbleMessage, modifier: Modifier) {
                     .drawBehind {
                         val frame = backdrop.value ?: return@drawBehind
                         val rect = bounds.rect ?: return@drawBehind
+                        val mix = videoMix.value
+                        if (mix <= 0f) return@drawBehind
                         val corner = BubbleCorner.toPx().coerceAtMost(size.minDimension / 2f)
                         buildLiquidOutline(
                             path = backdropPath,
@@ -277,7 +317,8 @@ private fun AutoSyncBubble(message: AutoSyncBubbleMessage, modifier: Modifier) {
                             swell = 0.008f * sin(clock.floatValue * 2.1f) * (1f - settle.value),
                             time = clock.floatValue,
                         )
-                        clipPath(backdropPath) { with(backdropPainter) { paint(frame, rect, corner) } }
+                        val copied = localCopyRect(frame, rect)
+                        clipPath(backdropPath) { with(backdropPainter) { paint(frame, copied, corner, mix) } }
                     },
             )
         } else if (backdrop != null) {
@@ -287,7 +328,7 @@ private fun AutoSyncBubble(message: AutoSyncBubbleMessage, modifier: Modifier) {
                 Modifier
                     .matchParentSize()
                     .drawWithContent {
-                        if (backdrop.value == null) return@drawWithContent
+                        if (backdrop.value == null || videoMix.value <= 0f) return@drawWithContent
                         buildLiquidOutline(
                             path = backdropPath,
                             width = size.width,
@@ -305,8 +346,13 @@ private fun AutoSyncBubble(message: AutoSyncBubbleMessage, modifier: Modifier) {
                         .matchParentSize()
                         .graphicsLayer {
                             renderEffect = BlurEffect(BackdropBlur.toPx(), BackdropBlur.toPx(), TileMode.Clamp)
+                            alpha = videoMix.value
                         }
-                        .drawBehind { drawRefractedBackdrop(backdrop.value, bounds.rect, innerPath) },
+                        .drawBehind {
+                            val frame = backdrop.value ?: return@drawBehind
+                            val rect = bounds.rect ?: return@drawBehind
+                            drawRefractedBackdrop(frame, localCopyRect(frame, rect), innerPath)
+                        },
                 )
             }
         }
@@ -321,7 +367,7 @@ private fun AutoSyncBubble(message: AutoSyncBubbleMessage, modifier: Modifier) {
                     liquid = 1f - settle.value,
                     tint = tint.value,
                     tinted = tinted.value,
-                    overVideo = backdrop?.value != null,
+                    overVideo = if (backdrop?.value != null) videoMix.value else 0f,
                 )
             },
             droplet = {
@@ -434,7 +480,7 @@ private fun DrawScope.drawLiquidGlass(
     liquid: Float,
     tint: Color,
     tinted: Float,
-    overVideo: Boolean,
+    overVideo: Float,
 ) {
     val corner = BubbleCorner.toPx().coerceAtMost(size.minDimension / 2f)
     val flowing = liquid > 0.002f
@@ -476,7 +522,7 @@ private fun DrawScope.drawLiquidGlass(
         }
     }
     // Over the blurred video the glass stays clear; without it the body carries the frost.
-    shape(color = GlassBody.copy(alpha = if (overVideo) 0.20f else 0.55f))
+    shape(color = GlassBody.copy(alpha = lerp(0.55f, 0.20f, overVideo)))
     if (tinted > 0f) {
         shape(
             brush = Brush.horizontalGradient(
@@ -489,9 +535,9 @@ private fun DrawScope.drawLiquidGlass(
     // Frost, brighter at the top where the light comes from.
     shape(
         brush = Brush.verticalGradient(
-            0f to Color.White.copy(alpha = if (overVideo) 0.16f else 0.22f),
-            0.5f to Color.White.copy(alpha = if (overVideo) 0.07f else 0.12f),
-            1f to Color.White.copy(alpha = if (overVideo) 0.10f else 0.14f),
+            0f to Color.White.copy(alpha = lerp(0.22f, 0.16f, overVideo)),
+            0.5f to Color.White.copy(alpha = lerp(0.12f, 0.07f, overVideo)),
+            1f to Color.White.copy(alpha = lerp(0.14f, 0.10f, overVideo)),
         ),
     )
     // Rim: bright on the upper left, a softer second highlight on the lower right.
@@ -524,15 +570,13 @@ private fun DrawScope.drawLiquidGlass(
  * middle, and along the edge a band that shows the video from just beyond the bubble, squeezed
  * in, the way a glass edge bends what is behind it. The blur on top softens the seam.
  */
-private fun DrawScope.drawRefractedBackdrop(frame: BubbleBackdropFrame?, bubble: Rect?, innerPath: Path) {
-    frame ?: return
-    bubble ?: return
+private fun DrawScope.drawRefractedBackdrop(frame: BubbleBackdropFrame, copied: Rect, innerPath: Path) {
     val image = frame.image
     // Where the copy lies, in the bubble's own coordinates.
-    val left = frame.windowRect.left - bubble.left
-    val top = frame.windowRect.top - bubble.top
-    val right = frame.windowRect.right - bubble.left
-    val bottom = frame.windowRect.bottom - bubble.top
+    val left = copied.left
+    val top = copied.top
+    val right = copied.right
+    val bottom = copied.bottom
     val cx = size.width / 2f
     val cy = size.height / 2f
 
@@ -752,4 +796,14 @@ private fun DrawScope.drawTrimmed(points: List<Offset>, progress: Float, color: 
         drawLine(color = color, start = from, end = end, strokeWidth = stroke, cap = StrokeCap.Round)
         remaining -= length
     }
+}
+
+private fun lerp(start: Float, stop: Float, fraction: Float): Float = start + (stop - start) * fraction
+
+/** The bubble's animated scale and offset, shared by its layer and its backdrop. */
+private class BubbleLayer {
+    var scaleX = 1f
+    var scaleY = 1f
+    var translationX = 0f
+    var translationY = 0f
 }

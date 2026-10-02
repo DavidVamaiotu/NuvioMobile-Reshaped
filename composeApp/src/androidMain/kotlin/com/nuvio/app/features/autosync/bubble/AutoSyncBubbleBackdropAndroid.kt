@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.PixelCopy
 import android.view.SurfaceView
 import android.view.View
@@ -17,6 +18,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalView
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -28,8 +30,8 @@ private const val MAX_FAILURES = 8
 
 /**
  * Copies the patch of video behind the bubble from the player's SurfaceView (ExoPlayer and mpv
- * both draw into one) with PixelCopy, shrunk so it is already soft. Only runs while the bubble is
- * on screen, and needs nothing from the player: it finds the video surface in the view tree.
+ * both draw into one) with PixelCopy, shrunk so it is already soft. Only runs while the bubble shows
+ * words or its card, and needs nothing from the player: it finds the video surface in the view tree.
  */
 @Composable
 internal fun rememberVideoBackdrop(bounds: BubbleWindowBounds, marginPx: Float): State<BubbleBackdropFrame?> {
@@ -46,8 +48,18 @@ internal fun rememberVideoBackdrop(bounds: BubbleWindowBounds, marginPx: Float):
         var surface: SurfaceView? = null
         var lookups = 0
         val location = IntArray(2)
+        var lastCopy = 0L
         while (isActive && failures < MAX_FAILURES) {
-            delay(bounds.sampleIntervalMs)
+            if (!bounds.sampling.value) {
+                // Only the droplet is left: drop the copy and wait until words show again.
+                frame.value = null
+                buffers.fill(null)
+                bounds.sampling.first { it }
+            }
+            // A steady rate: the time the copy took counts towards the wait.
+            val wait = BUBBLE_SAMPLE_INTERVAL_MS - (SystemClock.uptimeMillis() - lastCopy)
+            if (wait > 0) delay(wait)
+            lastCopy = SystemClock.uptimeMillis()
             if (surface == null || !surface.isAttachedToWindow || lookups++ % 32 == 0) {
                 surface = findVideoSurface(view.rootView)
             }
