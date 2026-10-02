@@ -765,6 +765,7 @@
     <string name="settings_poster_custom">Tuỳ chỉnh</string>
     <string name="settings_poster_description">Điều chỉnh độ rộng và bo tròn góc của thẻ.</string>
     <string name="settings_poster_hide_labels">Ẩn tiêu đề</string>
+    <string name="settings_poster_always_show_landscape_clearlogo">Luôn dùng phông nền kèm logo cho poster ngang</string>
     <string name="settings_poster_landscape_mode">Poster ngang</string>
     <string name="settings_poster_live_preview">Xem trước</string>
     <string name="settings_poster_option_with_value">%1$s (%2$s)</string>
@@ -1116,6 +1117,8 @@
     <string name="settings_playback_prefer_binge_group_description">Ưu tiên cùng cấu hình nguồn (cùng tiện ích/nhóm chất lượng) trước các quy tắc tự động phát thông thường.</string>
     <string name="settings_playback_reuse_binge_group">Dùng lại nhóm phát liên tục</string>
     <string name="settings_playback_reuse_binge_group_description">Ghi nhớ và dùng lại nhóm phát liên tục gần nhất giữa các phiên (Tiếp tục xem, Chi tiết...).</string>
+    <string name="settings_playback_preload_next_episode">Tải trước nguồn tập tiếp theo</string>
+    <string name="settings_playback_preload_next_episode_description">Bắt đầu tìm kiếm nguồn phát trong nền trước khi nút tập tiếp theo xuất hiện.</string>
     <string name="settings_playback_preferred_audio_language">Ngôn ngữ âm thanh ưu tiên</string>
     <string name="settings_playback_preferred_subtitle_language">Ngôn ngữ ưu tiên</string>
     <string name="settings_playback_presets">Mẫu có sẵn</string>

@@ -1,6 +1,7 @@
 package com.nuvio.app.features.player
 
 import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
+import com.nuvio.app.core.ui.NuvioToastController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.shuffle.EpisodeShuffleRepository
 import com.nuvio.app.features.shuffle.ShuffleSurface
@@ -359,6 +360,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
             args.launchId?.let { launchId -> PlayerLaunchStore.update(launchId) { currentLaunch(it) } }
             playerController?.clearNowPlayingInfo()
             P2pStreamingEngine.shutdown()
+            cancelNextEpisodePreload()
             PlayerStreamsRepository.clearAll()
         }
     }
@@ -560,12 +562,15 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
             current.shouldAutoSkip(playerSettingsUiState.autoSkipSegmentTypes) &&
             current !in autoSkippedIntervals
         ) {
-            autoSkippedIntervals.add(current)
             val durationMs = playbackSnapshot.durationMs
             val rawMs = current.internalSkipAction(skipIntervals, durationMs)?.targetMs ?: return@LaunchedEffect
-            controller.seekTo(if (durationMs > 0L) rawMs.coerceAtMost(durationMs - 1) else rawMs)
+            val seekPositionMs = if (durationMs > 0L) rawMs.coerceAtMost(durationMs - 1) else rawMs
+            val notification = current.autoSkipNotificationMessage(seekPositionMs)
+            autoSkippedIntervals.add(current)
+            controller.seekTo(seekPositionMs)
             scheduleProgressSyncAfterSeek()
             skipIntervalDismissed = true
+            notification?.let { NuvioToastController.show(it, AUTO_SKIP_NOTIFICATION_DURATION_MS) }
         }
     }
 
@@ -635,6 +640,15 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
                 } else null,
             )
         } else null
+    }
+
+    LaunchedEffect(playbackSnapshot.isEnded) {
+        if (playbackSnapshot.isEnded && nextEpisodeCardDismissed &&
+            playerSettingsUiState.streamAutoPlayNextEpisodeEnabled &&
+            nextEpisodeInfo?.hasAired == true
+        ) {
+            nextEpisodeCardDismissed = false
+        }
     }
 
     LaunchedEffect(

@@ -1,5 +1,6 @@
 package com.nuvio.app.features.settings
 
+import com.nuvio.app.features.player.DeviceLanguagePreferences
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.lang_arabic
 import nuvio.composeapp.generated.resources.lang_bengali
@@ -60,6 +61,11 @@ enum class AppLanguage(
     JAPANESE("ja", Res.string.lang_japanese),
     VIETNAMESE("vi", Res.string.lang_vietnamese),
     ;
+
+    fun isRightToLeft(): Boolean {
+        val languageCode = if (this == DEVICE) DeviceLanguagePreferences.preferredLanguageCodes().firstOrNull() else code
+        return languageCode?.substringBefore('-') in setOf(ARABIC.code, HEBREW.code, URDU.code)
+    }
 
     companion object {
         fun fromCode(code: String?): AppLanguage =
