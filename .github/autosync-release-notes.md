@@ -1,4 +1,2 @@
-- **More efficient AutoSync.** It gets more useful information from each sampled spot, skips recognition work that cannot help, re-evaluates listening when the stream changes, and counts each place in the film only once when voting on words.
-- **Simpler, steadier buffering.** The old Reshaped seek read-ahead is replaced by Nuvio's disk cache and ExoPlayer buffer.
-- **Lighter AutoSync bubble.** The video copy stays pinned in place and refreshes at up to 30 fps only while words are visible, reducing unnecessary rendering work.
-- **Updated to official Nuvio 0.5.5-beta.** Reshaped features are preserved on the new upstream base.
+- **AutoSync on PGS-only files.** An embedded subtitle index that takes longer than 7 seconds to parse is kept (up to 20 seconds) instead of being thrown away.
+- **Lighter seek previews.** The video is copied once, and only while a preview frame is still due.

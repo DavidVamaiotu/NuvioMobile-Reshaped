@@ -1,6 +1,6 @@
 name: AutoSync Release
 
-# Release trigger: Sync with Google (drive.file sign-in fix)
+# Release trigger: AutoSync PGS index timeout, lighter seek previews
 
 
 on:
