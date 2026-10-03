@@ -29,6 +29,12 @@ internal interface KeyframeSink {
     /** Whether a keyframe at [timeUs] would fill a missing thumbnail. */
     fun wantsKeyframe(timeUs: Long): Boolean
 
+    /**
+     * Whether the next keyframe after a sample at [timeUs] could still be wanted. False lets the
+     * tap stop copying video until one could be; it must never be false where [wantsKeyframe] is true.
+     */
+    fun mayWantKeyframesNear(timeUs: Long): Boolean = true
+
     /** The stream's seek map, once its index has been read. */
     fun onSeekMap(seekMap: SeekMap) = Unit
 }
@@ -62,11 +68,20 @@ private class VideoTapExtractor(
 
     override fun getSniffFailureDetails(): List<SniffFailure> = delegate.sniffFailureDetails
 
-    override fun init(output: ExtractorOutput) = delegate.init(VideoTapExtractorOutput(output, sink))
+    private var output: VideoTapExtractorOutput? = null
+
+    override fun init(output: ExtractorOutput) {
+        val tapped = VideoTapExtractorOutput(output, sink)
+        this.output = tapped
+        delegate.init(tapped)
+    }
 
     override fun read(input: ExtractorInput, seekPosition: PositionHolder): Int = delegate.read(input, seekPosition)
 
-    override fun seek(position: Long, timeUs: Long) = delegate.seek(position, timeUs)
+    override fun seek(position: Long, timeUs: Long) {
+        output?.onSeek()
+        delegate.seek(position, timeUs)
+    }
 
     override fun release() = delegate.release()
 
@@ -87,6 +102,11 @@ private class VideoTapExtractorOutput(
 
     override fun endTracks() = delegate.endTracks()
 
+    /** Sample times start over somewhere else: watch for keyframes again until the first sample. */
+    fun onSeek() {
+        videoOutputs.values.forEach { (it as? VideoTapTrackOutput)?.onSeek() }
+    }
+
     override fun seekMap(seekMap: SeekMap) {
         runCatching { sink.onSeekMap(seekMap) }
         delegate.seekMap(seekMap)
@@ -97,6 +117,10 @@ private class VideoTapExtractorOutput(
  * Keeps the bytes of the samples being written until [sampleMetadata] says whether they form a
  * keyframe (extractors may write a sample in parts and report it later, with [offset] bytes of
  * following samples already written). Same bookkeeping as the AutoSync audio tap.
+ *
+ * Bytes read from the stream go straight into [pending] and are handed to playback from there,
+ * so each one is copied once. Between keyframes no slot could use (see
+ * [KeyframeSink.mayWantKeyframesNear]) nothing is copied at all.
  */
 private class VideoTapTrackOutput(
     private val delegate: TrackOutput,
@@ -107,8 +131,13 @@ private class VideoTapTrackOutput(
     private var pending = ByteArray(0)
     private var start = 0
     private var end = 0
-    private var scratch = ByteArray(0)
-    private val scratchReader = ParsableByteArray()
+    private val pendingReader = ParsableByteArray()
+
+    /** Latest sample time since the stream started or seeked, or [C.TIME_UNSET]. */
+    private var latestTimeUs = C.TIME_UNSET
+
+    /** Whether the next keyframe could be wanted, judged from [latestTimeUs]. */
+    private var keyframeInReach = true
 
     override fun format(format: Format) {
         this.format = format
@@ -118,18 +147,18 @@ private class VideoTapTrackOutput(
     override fun durationUs(durationUs: Long) = delegate.durationUs(durationUs)
 
     override fun sampleData(input: DataReader, length: Int, allowEndOfInput: Boolean, sampleDataPart: Int): Int {
-        if (!updateCapturing()) {
+        if (!updateCapturing() || !reserve(length)) {
             return delegate.sampleData(input, length, allowEndOfInput, sampleDataPart)
         }
-        if (scratch.size < length) scratch = ByteArray(maxOf(length, 16_384))
-        val read = input.read(scratch, 0, length)
+        val read = input.read(pending, end, length)
         if (read == C.RESULT_END_OF_INPUT) {
             if (allowEndOfInput) return C.RESULT_END_OF_INPUT
             throw EOFException()
         }
-        append(scratch, 0, read)
-        scratchReader.reset(scratch, read)
-        delegate.sampleData(scratchReader, read, sampleDataPart)
+        pendingReader.reset(pending, end + read)
+        pendingReader.setPosition(end)
+        end += read
+        delegate.sampleData(pendingReader, read, sampleDataPart)
         return read
     }
 
@@ -164,11 +193,20 @@ private class VideoTapTrackOutput(
                 end = 0
             }
         }
+        if (timeUs != C.TIME_UNSET && (latestTimeUs == C.TIME_UNSET || timeUs > latestTimeUs)) {
+            latestTimeUs = timeUs
+            keyframeInReach = runCatching { sink.mayWantKeyframesNear(timeUs) }.getOrDefault(true)
+        }
         delegate.sampleMetadata(timeUs, flags, size, offset, cryptoData)
     }
 
+    fun onSeek() {
+        latestTimeUs = C.TIME_UNSET
+        keyframeInReach = true
+    }
+
     private fun updateCapturing(): Boolean {
-        val wanted = format != null && runCatching { sink.wantsKeyframes() }.getOrDefault(false)
+        val wanted = format != null && keyframeInReach && runCatching { sink.wantsKeyframes() }.getOrDefault(false)
         if (wanted != capturing) {
             capturing = wanted
             start = 0
@@ -178,26 +216,32 @@ private class VideoTapTrackOutput(
     }
 
     private fun append(data: ByteArray, offset: Int, length: Int) {
-        if (length <= 0) return
-        if (pending.size - end < length) {
-            val retained = end - start
-            if (start > 0) {
-                pending.copyInto(pending, 0, start, end)
-                start = 0
-                end = retained
-            }
-            if (pending.size - end < length) {
-                val required = end + length
-                if (required > MAX_PENDING_BYTES) {
-                    start = 0
-                    end = 0
-                    return
-                }
-                pending = pending.copyOf(maxOf(required, pending.size * 2, 65_536))
-            }
-        }
+        if (length <= 0 || !reserve(length)) return
         data.copyInto(pending, end, offset, offset + length)
         end += length
+    }
+
+    /**
+     * Makes room for [length] more bytes at [end]. False (and nothing kept) when that would pass
+     * [MAX_PENDING_BYTES]; the bytes then reach playback without being kept.
+     */
+    private fun reserve(length: Int): Boolean {
+        if (pending.size - end >= length) return true
+        val retained = end - start
+        if (start > 0) {
+            pending.copyInto(pending, 0, start, end)
+            start = 0
+            end = retained
+        }
+        if (pending.size - end >= length) return true
+        val required = end.toLong() + length
+        if (required > MAX_PENDING_BYTES) {
+            start = 0
+            end = 0
+            return false
+        }
+        pending = pending.copyOf(maxOf(required.toInt(), pending.size * 2, 65_536))
+        return true
     }
 
     companion object {

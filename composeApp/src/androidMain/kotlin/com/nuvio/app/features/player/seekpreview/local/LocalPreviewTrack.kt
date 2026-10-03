@@ -270,6 +270,23 @@ internal class LocalPreviewTrack(
     }
 
     /**
+     * Whether a keyframe from just before to [KEYFRAME_LOOKAHEAD_MS] after [timeUs] could still be
+     * wanted ([wantsKeyframe]). False lets the tap skip copying the video until the next slot that
+     * still needs a frame comes within reach. Only ever false where [wantsKeyframe] would be too.
+     */
+    fun mayWantKeyframesNear(timeUs: Long): Boolean {
+        if (closed) return false
+        val fromMs = timeUs / 1_000L - KEYFRAME_LOOKBEHIND_MS
+        val toMs = timeUs / 1_000L + KEYFRAME_LOOKAHEAD_MS
+        if (toMs < 0L || fromMs > durationMs + SLOT_MS) return false
+        val first = ((fromMs.coerceAtLeast(0L) + SLOT_MS / 2) / SLOT_MS).toInt().coerceIn(0, slotCount - 1)
+        val last = ((toMs.coerceAtLeast(0L) + SLOT_MS / 2) / SLOT_MS).toInt().coerceIn(0, slotCount - 1)
+        return synchronized(lock) {
+            candidate != null || (first..last).any { slotState[it] == EMPTY }
+        }
+    }
+
+    /**
      * A keyframe playback downloaded. Each slot keeps the keyframe nearest its time rather than
      * the first one that arrives: keyframes come in playback order, so one before the slot's
      * time waits as the candidate until the next keyframe shows whether it is closer. One at or
@@ -516,6 +533,13 @@ internal class LocalPreviewTrack(
     companion object {
         private const val TAG = "NuvioLocalPreviews"
         const val SLOT_MS = 10_000L
+        /**
+         * How far past the latest sample time the next keyframe is looked for. In decode order a
+         * keyframe's time is later than every sample before it, by at most the B-frame reorder span
+         * (well under a second); the margins leave room for that and for timestamps' jitter.
+         */
+        private const val KEYFRAME_LOOKAHEAD_MS = 3_000L
+        private const val KEYFRAME_LOOKBEHIND_MS = 1_000L
         private const val MAX_DECODED = 48
         private const val TAP_QUEUE = 3
         private const val UI_UPDATE_INTERVAL_MS = 250L
