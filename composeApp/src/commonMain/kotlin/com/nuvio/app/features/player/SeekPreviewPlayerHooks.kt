@@ -105,9 +105,7 @@ private fun PlayerScreenRuntime.RenderSeekPreviewOverlays() {
         SeekPreviewThumbnailStrip(
             session = session,
             positionMs = gesturePositionMs ?: playbackSnapshot.positionMs,
-            durationMs = playbackSnapshot.durationMs,
             active = gesturePositionMs != null,
-            followPosition = false,
             modifier = Modifier
                 .align(Alignment.Center)
                 .padding(horizontal = horizontalSafePadding),
@@ -156,7 +154,6 @@ internal fun SeekPreviewAboveTimeline(positionMs: Long, durationMs: Long, active
         SeekPreviewThumbnailStrip(
             session = session,
             positionMs = positionMs,
-            durationMs = durationMs,
             active = active,
         )
     }

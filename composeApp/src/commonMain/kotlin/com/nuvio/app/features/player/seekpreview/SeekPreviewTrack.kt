@@ -21,6 +21,12 @@ internal interface SeekPreviewTrack {
     suspend fun thumbnailFor(positionMs: Long): SeekrThumbnail?
 
     /**
+     * Like [thumbnailFor], for a frame shown beside the one being scrubbed to: it does not steer
+     * background work (the on-device track decodes nearest the last [thumbnailFor] first).
+     */
+    suspend fun sideThumbnailFor(positionMs: Long): SeekrThumbnail? = thumbnailFor(positionMs)
+
+    /**
      * The cue window (preview timeline) of the frame [thumbnailFor] would return for
      * [positionMs], without loading the frame, or null when there is none.
      */

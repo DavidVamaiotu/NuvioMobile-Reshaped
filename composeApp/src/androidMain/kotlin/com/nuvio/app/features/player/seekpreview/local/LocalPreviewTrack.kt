@@ -161,12 +161,18 @@ internal class LocalPreviewTrack(
 
     // ---- Lookups -------------------------------------------------------------------------
 
-    override suspend fun thumbnailFor(positionMs: Long): SeekrThumbnail? {
+    override suspend fun thumbnailFor(positionMs: Long): SeekrThumbnail? = lookup(positionMs, focus = true)
+
+    override suspend fun sideThumbnailFor(positionMs: Long): SeekrThumbnail? = lookup(positionMs, focus = false)
+
+    private suspend fun lookup(positionMs: Long, focus: Boolean): SeekrThumbnail? {
         val corrected = (positionMs + offsetMs).coerceIn(0L, (durationMs - 1).coerceAtLeast(0L))
         val slot = (corrected / SLOT_MS).toInt().coerceIn(0, slotCount - 1)
-        focusSlot = slot
-        lastLookupAtMs = SystemClock.elapsedRealtime()
-        if (synchronized(lock) { spooled.isNotEmpty() }) scheduleDrain()
+        if (focus) {
+            focusSlot = slot
+            lastLookupAtMs = SystemClock.elapsedRealtime()
+            if (synchronized(lock) { spooled.isNotEmpty() }) scheduleDrain()
+        }
         val exact = synchronized(lock) { exactFrameFor(corrected) }
         val found = exact ?: synchronized(lock) { nearestFilled(slot) } ?: return null
         val bitmap = bitmapFor(found) ?: return null
