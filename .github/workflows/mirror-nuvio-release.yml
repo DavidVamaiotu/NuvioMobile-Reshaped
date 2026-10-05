@@ -1,6 +1,6 @@
 name: AutoSync Release
 
-# Release trigger: AutoSync PGS index timeout, lighter seek previews
+# Release trigger: Netflix-style scrub previews
 
 
 on:

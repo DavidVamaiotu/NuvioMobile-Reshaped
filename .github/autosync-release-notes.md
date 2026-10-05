@@ -1,2 +1,1 @@
-- **AutoSync on PGS-only files.** An embedded subtitle index that takes longer than 7 seconds to parse is kept (up to 20 seconds) instead of being thrown away.
-- **Lighter seek previews.** The video is copied once, and only while a preview frame is still due.
+- **Netflix-style scrub previews.** While scrubbing, previews show as a filmstrip of frames with the current one outlined, sliding as you move. Dark keyframes get replaced by a brighter one, and missing frames are left out instead of showing empty tiles.
