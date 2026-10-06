@@ -7,7 +7,6 @@ import com.nuvio.app.features.player.SubtitleLanguageMatching
 import com.nuvio.app.features.player.SubtitleSyncCue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.currentCoroutineContext
@@ -708,7 +707,7 @@ internal object AutomaticSubtitleSync {
             if (referenceTracks.size >= 3) {
                 val consistencyStarted = SystemClock.elapsedRealtime()
                 val consistencyContext = currentCoroutineContext()
-                val outliers = withContext(Dispatchers.Default) {
+                val outliers = withContext(autoSyncDispatcher) {
                     AutoSyncReferenceConsistency.findOutliers(
                         references = referenceTracks.mapNotNull { track ->
                             preparedReferenceActivity(track, referenceActivityCache)?.let {
@@ -886,14 +885,14 @@ internal object AutomaticSubtitleSync {
                 }
 
                 val activityPrepStarted = SystemClock.elapsedRealtime()
-                val targetActivity = withContext(Dispatchers.Default) {
+                val targetActivity = withContext(autoSyncDispatcher) {
                     AutoSyncTimelineRetimer.prepareUnitActivity(loaded.cues)
                 }
                 val activityPrepMs = SystemClock.elapsedRealtime() - activityPrepStarted
 
                 val preflightStarted = SystemClock.elapsedRealtime()
                 val preflightResult = if (targetActivity != null) {
-                    withContext(Dispatchers.Default) {
+                    withContext(autoSyncDispatcher) {
                         AutoSyncDelayPreflight.evaluate(
                             referenceTracks = referenceTracks,
                             target = loaded.cues,
@@ -912,7 +911,7 @@ internal object AutomaticSubtitleSync {
                 val preflightMs = SystemClock.elapsedRealtime() - preflightStarted
 
                 val rankingStarted = SystemClock.elapsedRealtime()
-                val rankedReferences = withContext(Dispatchers.Default) {
+                val rankedReferences = withContext(autoSyncDispatcher) {
                     rankReferenceCandidates(
                         target = loaded.cues,
                         referenceTracks = referenceTracks,
@@ -984,7 +983,7 @@ internal object AutomaticSubtitleSync {
 
                     val jobId = nextPairJobId++
                     activePairPriorities[jobId] = hypothesis.schedulingScore
-                    activePairJobs[jobId] = async(Dispatchers.Default) {
+                    activePairJobs[jobId] = async(autoSyncDispatcher) {
                         val representative = hypothesis.family.representative
                         val evaluation = evaluatePair(
                             label =
@@ -1056,7 +1055,7 @@ internal object AutomaticSubtitleSync {
                     val target = family.representative.loaded.cues
                     val preflightResult =
                         if (family.targetActivity != null) {
-                            withContext(Dispatchers.Default) {
+                            withContext(autoSyncDispatcher) {
                                 AutoSyncDelayPreflight.evaluate(
                                     referenceTracks = forcedFallbackTracks,
                                     target = target,
@@ -1072,7 +1071,7 @@ internal object AutomaticSubtitleSync {
                             )
                         }
                     val preflight = preflightResult.best
-                    val rankedReferences = withContext(Dispatchers.Default) {
+                    val rankedReferences = withContext(autoSyncDispatcher) {
                         rankReferenceCandidates(
                             target = target,
                             referenceTracks = forcedFallbackTracks,
@@ -1483,7 +1482,7 @@ internal object AutomaticSubtitleSync {
         preflightEvidence: AutoSyncTimelineRetimer.DelayOnlySearchEvidence? = null,
         allowPrecomputedDelayFastPath: Boolean = false,
         preparedTargetActivity: AutoSyncTimelineRetimer.PreparedActivity? = null,
-    ): PairEvaluation = withContext(Dispatchers.Default) {
+    ): PairEvaluation = withContext(autoSyncDispatcher) {
         val evaluationContext = currentCoroutineContext()
         val targetActivity =
             preparedTargetActivity ?: AutoSyncTimelineRetimer.prepareUnitActivity(target)
@@ -1894,7 +1893,7 @@ internal object AutomaticSubtitleSync {
             val parseStarted = SystemClock.elapsedRealtime()
             val cues = try {
                 val parseAndNormalize: suspend () -> List<SubtitleSyncCue> = {
-                    withContext(Dispatchers.Default) {
+                    withContext(autoSyncDispatcher) {
                         val parseContext = currentCoroutineContext()
                         parseContext.ensureActive()
                         val parsed = PlayerSubtitleCueParser.parse(

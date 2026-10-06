@@ -51,7 +51,7 @@ internal suspend fun applyAutoSyncSidecarTimeline(
     val waitMs = SystemClock.elapsedRealtime() - waitStarted
 
     val retimeStarted = SystemClock.elapsedRealtime()
-    val retimed = withContext(Dispatchers.Default) {
+    val retimed = withContext(autoSyncDispatcher) {
         retimeSidecarTimedCues(current, timeline)
     }
     val retimeMs = SystemClock.elapsedRealtime() - retimeStarted
@@ -103,7 +103,7 @@ internal suspend fun replaceAutoSyncSidecarSubtitle(
         }
 
         val parseStarted = SystemClock.elapsedRealtime()
-        val parsed = withContext(Dispatchers.Default) {
+        val parsed = withContext(autoSyncDispatcher) {
             parseSidecarTimedCuesRobust(body, url).cues
         }
         parseMs = SystemClock.elapsedRealtime() - parseStarted
@@ -114,7 +114,7 @@ internal suspend fun replaceAutoSyncSidecarSubtitle(
         }
 
         val retimeStarted = SystemClock.elapsedRealtime()
-        val prepared = withContext(Dispatchers.Default) {
+        val prepared = withContext(autoSyncDispatcher) {
             retimeSidecarTimedCues(parsed, timeline)
         }
         retimeMs = SystemClock.elapsedRealtime() - retimeStarted
