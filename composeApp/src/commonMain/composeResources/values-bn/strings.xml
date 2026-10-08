@@ -2403,4 +2403,23 @@
     <string name="movie_status_rumored">গুজব</string>
     <string name="movie_status_in_production">প্রোডাকশনে</string>
     <string name="movie_status_post_production">পোস্ট-প্রোডাকশনে</string>
+    <string name="cd_switch_player_engine">প্লেয়ার ইঞ্জিন সুইচ করুন</string>
+    <string name="cd_stream_info">স্ট্রিম ইনফো</string>
+    <string name="player_engine_switching_manual_message">%1$s-এ সুইচ করা হচ্ছে…</string>
+    <string name="stream_info_section_source">সোর্স</string>
+    <string name="stream_info_section_video">ভিডিও</string>
+    <string name="stream_info_section_audio">অডিও</string>
+    <string name="stream_info_section_subtitle">সাবটাইটেল</string>
+    <string name="stream_info_codec">কোডেক</string>
+    <string name="stream_info_resolution">রেজল্যুশন</string>
+    <string name="stream_info_frame_rate">ফ্রেম রেট</string>
+    <string name="stream_info_bitrate">বিটরেট</string>
+    <string name="stream_info_channels">চ্যানেলগুলি</string>
+    <string name="stream_info_sample_rate">স্যাম্পল রেট</string>
+    <string name="stream_info_language">ভাষা</string>
+    <string name="stream_info_name">নাম</string>
+    <string name="stream_info_source">সোর্স</string>
+    <string name="stream_info_subtitle_source_addon">অ্যাডন</string>
+    <string name="stream_info_subtitle_source_embedded">এমবেডেড</string>
+    <string name="stream_info_player_engine">প্লেয়ার ইঞ্জিন</string>
 </resources>

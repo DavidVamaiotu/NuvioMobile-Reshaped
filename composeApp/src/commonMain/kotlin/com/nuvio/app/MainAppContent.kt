@@ -178,6 +178,8 @@ import com.nuvio.app.features.watchprogress.toContinueWatchingItem
 import com.nuvio.app.navigation.*
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import com.nuvio.app.features.servers.ServerMatcher
+import com.nuvio.app.features.servers.ServerRepository
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -384,12 +386,18 @@ internal fun MainAppContent(
         buildAddonCatalogRefreshSignature(addonsUiState.addons)
     }
 
-    LaunchedEffect(appContentGeneration, homeCatalogRefreshKey) {
+    val serversUiState by remember {
+        ServerRepository.ensureLoaded()
+        ServerRepository.uiState
+    }.collectAsStateWithLifecycle()
+
+    LaunchedEffect(appContentGeneration, homeCatalogRefreshKey, serversUiState.revision) {
         if (!ownsAppRuntime) return@LaunchedEffect
         val enabledAddons = addonsUiState.addons.enabledAddons()
         if (enabledAddons.isWaitingForFirstEnabledManifest()) return@LaunchedEffect
         HomeCatalogSettingsRepository.syncCatalogs(enabledAddons)
         HomeRepository.refresh(enabledAddons)
+        ServerMatcher.warm()
     }
 
     fun activateTab(tab: AppScreenTab) {
@@ -1343,11 +1351,7 @@ internal fun MainAppContent(
                                     coroutineScope.launch { openReshapedLiveTvChannel(channel) }
                                 },
                                 onCatalogClick = onCatalogClick,
-                                onPosterClick = { meta ->
-                                    navController.navigate(
-                                        DetailRoute(type = meta.type, id = meta.id, title = meta.name),
-                                    )
-                                },
+                                onPosterClick = navController::openPreview,
                                 onPosterLongClick = { meta ->
                                     openPosterActions(PosterActionTarget(preview = meta))
                                 },

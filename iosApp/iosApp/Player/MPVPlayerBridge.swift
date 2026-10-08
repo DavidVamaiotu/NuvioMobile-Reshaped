@@ -196,6 +196,7 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     func getIsCacheIdle() -> Bool { return playerVC?.isCacheIdle ?? true }
     func getPlaybackSpeed() -> Float { playerVC?.currentSpeed ?? 1.0 }
     func getErrorMessage() -> String { playerVC?.currentErrorMessage ?? "" }
+    func getProperty(name: String) -> String { playerVC?.getString(name) ?? "" }
 
     func destroy() {
         playerVC?.destroyPlayer()
@@ -1249,7 +1250,7 @@ final class MPVPlayerViewController: UIViewController {
         return data
     }
 
-    private func getString(_ name: String) -> String? {
+    fileprivate func getString(_ name: String) -> String? {
         guard mpv != nil else { return nil }
         let cstr = mpv_get_property_string(mpv, name)
         let str: String? = cstr == nil ? nil : String(cString: cstr!)

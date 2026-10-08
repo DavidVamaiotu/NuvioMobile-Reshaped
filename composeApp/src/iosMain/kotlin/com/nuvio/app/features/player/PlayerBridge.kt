@@ -87,6 +87,7 @@ interface NuvioPlayerBridge {
     fun getIsCacheIdle(): Boolean
     fun getPlaybackSpeed(): Float
     fun getErrorMessage(): String
+    fun getProperty(name: String): String
     fun destroy()
 }
 

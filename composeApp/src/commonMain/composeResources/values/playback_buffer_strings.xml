@@ -7,6 +7,4 @@
     <string name="settings_playback_buffer_auto">Auto</string>
     <string name="settings_playback_buffer_value_gb">%1$d GB</string>
     <string name="settings_playback_buffer_description">Keeps what you have watched in a disk cache, like Nuvio TV, so jumping back is instant. Auto sizes it from free storage. It is cleared when playback ends. Tap to change; applies from the next playback.</string>
-    <string name="settings_playback_memory_buffer_title">Larger memory buffer</string>
-    <string name="settings_playback_memory_buffer_description">Uses Nuvio TV\'s ExoPlayer buffer: up to 45 s ahead, sized from this phone\'s memory. Applies from the next playback.</string>
 </resources>

@@ -43,12 +43,17 @@ expect fun ManagePlayerPictureInPicture(
 expect fun rememberIsInPictureInPicture(): Boolean
 
 @Composable
-fun rememberPlayerGestureController(): PlayerGestureController? {
+fun rememberPlayerGestureController(restoreBrightness: Boolean): PlayerGestureController? {
     val controller = rememberPlatformPlayerGestureController() ?: return null
+    DisposableEffect(controller, restoreBrightness) {
+        if (restoreBrightness) {
+            PlayerSettingsStorage.loadPlaybackBrightness()
+                ?.takeIf { it in 0f..1f }
+                ?.let(controller::setBrightness)
+        }
+        onDispose {}
+    }
     DisposableEffect(controller) {
-        PlayerSettingsStorage.loadPlaybackBrightness()
-            ?.takeIf { it in 0f..1f }
-            ?.let(controller::setBrightness)
         onDispose { VolumeBoost.resetSession() } // Nuvio RS: volume boost lasts one session
     }
     return remember(controller) {

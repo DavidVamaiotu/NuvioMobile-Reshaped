@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 
 /**
- * ExoPlayer disk cache for [PlaybackBufferSettings], ported from Nuvio TV's VOD disk cache
+ * ExoPlayer disk cache for [PlaybackDiskCacheSettings], ported from Nuvio TV's VOD disk cache
  * (PlayerMediaSourceFactory): what the player reads is also written to a cache on storage, so a
  * seek back into anything already loaded reads from disk instead of the network.
  *
@@ -88,8 +88,8 @@ internal object PlaybackDiskCache {
         cacheable: Boolean,
         upstream: DataSource.Factory,
     ): DataSource.Factory {
-        val choice = PlaybackBufferSettings.bufferMb.value
-        if (choice == PlaybackBufferSettings.NUVIO_DEFAULT_MB || !cacheable || !isRemoteHttp(sourceUrl) ||
+        val choice = PlaybackDiskCacheSettings.bufferMb.value
+        if (choice == PlaybackDiskCacheSettings.NUVIO_DEFAULT_MB || !cacheable || !isRemoteHttp(sourceUrl) ||
             looksAdaptive(sourceUrl) || LiveTvPlaybackRegistry.isLiveTv(sourceUrl)
         ) return upstream
         val appContext = context.applicationContext
@@ -111,9 +111,12 @@ internal object PlaybackDiskCache {
         return DiskCacheDataSourceFactory(session, upstream)
     }
 
-    /** The factory without the cache, for readers other than the player (they read elsewhere). */
-    fun unwrap(factory: DataSource.Factory): DataSource.Factory =
-        (factory as? DiskCacheDataSourceFactory)?.upstream ?: factory
+    /**
+     * Whether Nuvio's own VOD cache stays off for this playback: the Seek buffer already caches it
+     * ([wrapped] is not [network]), or it is Live TV or a stream already on the device.
+     */
+    fun skipsNuvioVodCache(wrapped: DataSource.Factory, network: DataSource.Factory, sourceUrl: String): Boolean =
+        wrapped !== network || !isRemoteHttp(sourceUrl) || LiveTvPlaybackRegistry.isLiveTv(sourceUrl)
 
     /** Where playback is in [sourceUrl], so only the last 1 GB behind it is kept. Main thread. */
     fun onPlayhead(sourceUrl: String, positionMs: Long, durationMs: Long) {
@@ -160,7 +163,7 @@ internal object PlaybackDiskCache {
         val runtimeMax = (if (free > FREE_SPACE_RESERVE_BYTES) free - FREE_SPACE_RESERVE_BYTES else free * 8 / 10)
             .coerceAtMost(MAX_BYTES)
         if (runtimeMax < MIN_BYTES) return 0L
-        if (choice == PlaybackBufferSettings.AUTO_MB) {
+        if (choice == PlaybackDiskCacheSettings.AUTO_MB) {
             return maxOf(AUTO_FLOOR_BYTES, free / 5).coerceIn(MIN_BYTES, runtimeMax)
         }
         return (choice * MB).coerceIn(MIN_BYTES, runtimeMax)
