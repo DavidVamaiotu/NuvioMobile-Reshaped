@@ -16,7 +16,7 @@ import org.jetbrains.compose.resources.stringResource
 
 /** Seek buffer: disk cache the way Nuvio TV does it (Android players only). */
 @Composable
-internal fun PlaybackDiskCacheSettingsSection(isTablet: Boolean) {
+internal fun PlaybackBufferSettingsSection(isTablet: Boolean) {
     if (isIos) return
     val bufferMb by PlaybackDiskCacheSettings.bufferMb.collectAsStateWithLifecycle()
 
