@@ -1,6 +1,6 @@
 name: AutoSync Release
 
-# Release trigger: Netflix-style scrub previews
+# Release trigger: Nuvio 0.5.8-beta sync
 
 
 on:
