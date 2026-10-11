@@ -174,9 +174,10 @@ fun DetailMetaInfo(
 }
 
 @Composable
-private fun DetailRatingsRow(
+internal fun DetailRatingsRow(
     ratings: List<MetaExternalRating>,
-    horizontalScrollPadding: Dp,
+    modifier: Modifier = Modifier,
+    horizontalScrollPadding: Dp = 0.dp,
 ) {
     val orderedRatings = remember(ratings) {
         val bySource = ratings.associateBy { it.source }
@@ -188,7 +189,7 @@ private fun DetailRatingsRow(
     if (orderedRatings.isEmpty()) return
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .nuvioHorizontalScrollBleed(horizontalScrollPadding)
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
@@ -232,7 +233,7 @@ private fun DetailRatingsRow(
 }
 
 @Composable
-private fun ImdbRatingSourceLabel(
+internal fun ImdbRatingSourceLabel(
     storeTextStyle: TextStyle,
     storeTextColor: Color,
 ) {
@@ -263,7 +264,7 @@ private fun ImdbRatingSourceLabel(
 }
 
 @Composable
-private fun MetaLabelValueRow(
+internal fun MetaLabelValueRow(
     label: String,
     value: String,
 ) {
@@ -283,7 +284,7 @@ private fun MetaLabelValueRow(
 }
 
 @Composable
-private fun DetailHeroMetaBadge(
+internal fun DetailHeroMetaBadge(
     text: String,
     contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
@@ -306,7 +307,7 @@ private fun DetailHeroMetaBadge(
     }
 }
 
-private val ImdbYellow = Color(0xFFF5C518)
+internal val ImdbYellow = Color(0xFFF5C518)
 private val ImdbBlack = Color(0xFF000000)
 
 private data class RatingVisuals(

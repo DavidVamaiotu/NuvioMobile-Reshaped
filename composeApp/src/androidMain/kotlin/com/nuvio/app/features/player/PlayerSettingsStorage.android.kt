@@ -58,6 +58,17 @@ actual object PlayerSettingsStorage {
     private const val decoderPriorityKey = "decoder_priority"
     private const val mapDV7ToHevcKey = "map_dv7_to_hevc"
     private const val tunnelingEnabledKey = "tunneling_enabled"
+    private const val exoNativeMemoryEnabledKey = "exo_native_memory_enabled"
+    private const val vodCacheEnabledKey = "vod_cache_enabled"
+    private const val vodCacheSizeModeKey = "vod_cache_size_mode"
+    private const val vodCacheSizeMbKey = "vod_cache_size_mb"
+    private const val bufferEngineEnabledKey = "buffer_engine_enabled"
+    private const val minBufferMsKey = "min_buffer_ms"
+    private const val maxBufferMsKey = "max_buffer_ms"
+    private const val bufferForPlaybackMsKey = "buffer_for_playback_ms"
+    private const val bufferForPlaybackAfterRebufferMsKey = "buffer_for_playback_after_rebuffer_ms"
+    private const val backBufferDurationMsKey = "back_buffer_duration_ms"
+    private const val targetBufferSizeMbKey = "target_buffer_size_mb"
     private const val streamAutoPlayModeKey = "stream_auto_play_mode"
     private const val streamAutoPlaySourceKey = "stream_auto_play_source"
     private const val streamAutoPlaySelectedAddonsKey = "stream_auto_play_selected_addons"
@@ -79,6 +90,7 @@ actual object PlayerSettingsStorage {
     private const val nextEpisodeThresholdModeKey = "next_episode_threshold_mode"
     private const val nextEpisodeThresholdPercentKey = "next_episode_threshold_percent_v2"
     private const val nextEpisodeThresholdMinutesBeforeEndKey = "next_episode_threshold_minutes_before_end_v2"
+    private const val preloadNextEpisodeSourcesKey = "preload_next_episode_sources"
     private const val useLibassKey = "use_libass"
     private const val libassRenderTypeKey = "libass_render_type"
     private const val iosVideoOutputPresetKey = "ios_video_output_preset"
@@ -152,6 +164,7 @@ actual object PlayerSettingsStorage {
         nextEpisodeThresholdModeKey,
         nextEpisodeThresholdPercentKey,
         nextEpisodeThresholdMinutesBeforeEndKey,
+        preloadNextEpisodeSourcesKey,
         useLibassKey,
         libassRenderTypeKey,
         iosVideoOutputPresetKey,
@@ -172,10 +185,14 @@ actual object PlayerSettingsStorage {
     )
 
     private var preferences: SharedPreferences? = null
+    private var appContext: Context? = null
 
     fun initialize(context: Context) {
+        appContext = context.applicationContext
         preferences = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
     }
+
+    internal fun applicationContext(): Context? = appContext
 
     actual fun loadPendingExternalPlayback(): String? = preferences?.getString(pendingExternalPlaybackKey, null)
 
@@ -759,6 +776,92 @@ actual object PlayerSettingsStorage {
             ?.apply()
     }
 
+    actual fun loadExoNativeMemoryEnabled(): Boolean? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(exoNativeMemoryEnabledKey)
+            if (sharedPreferences.contains(key)) sharedPreferences.getBoolean(key, false) else null
+        }
+
+    actual fun saveExoNativeMemoryEnabled(enabled: Boolean) {
+        preferences?.edit()?.putBoolean(ProfileScopedKey.of(exoNativeMemoryEnabledKey), enabled)?.apply()
+    }
+
+    actual fun loadVodCacheEnabled(): Boolean? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(vodCacheEnabledKey)
+            if (sharedPreferences.contains(key)) sharedPreferences.getBoolean(key, false) else null
+        }
+
+    actual fun saveVodCacheEnabled(enabled: Boolean) {
+        preferences?.edit()?.putBoolean(ProfileScopedKey.of(vodCacheEnabledKey), enabled)?.apply()
+    }
+
+    actual fun loadVodCacheSizeMode(): String? =
+        preferences?.getString(ProfileScopedKey.of(vodCacheSizeModeKey), null)
+
+    actual fun saveVodCacheSizeMode(mode: String) {
+        preferences?.edit()?.putString(ProfileScopedKey.of(vodCacheSizeModeKey), mode)?.apply()
+    }
+
+    actual fun loadVodCacheSizeMb(): Int? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(vodCacheSizeMbKey)
+            if (sharedPreferences.contains(key)) sharedPreferences.getInt(key, VodCacheSizing.DEFAULT_SIZE_MB) else null
+        }
+
+    actual fun saveVodCacheSizeMb(sizeMb: Int) {
+        preferences?.edit()
+            ?.putInt(
+                ProfileScopedKey.of(vodCacheSizeMbKey),
+                sizeMb.coerceIn(VodCacheSizing.MIN_SIZE_MB, VodCacheSizing.MAX_SIZE_MB),
+            )
+            ?.apply()
+    }
+
+    actual fun loadBufferEngineEnabled(): Boolean? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(bufferEngineEnabledKey)
+            if (sharedPreferences.contains(key)) sharedPreferences.getBoolean(key, false) else null
+        }
+
+    actual fun saveBufferEngineEnabled(enabled: Boolean) {
+        preferences?.edit()?.putBoolean(ProfileScopedKey.of(bufferEngineEnabledKey), enabled)?.apply()
+    }
+
+    actual fun loadMinBufferMs(): Int? = loadStoredInt(minBufferMsKey)
+
+    actual fun saveMinBufferMs(value: Int) = saveStoredInt(minBufferMsKey, value)
+
+    actual fun loadMaxBufferMs(): Int? = loadStoredInt(maxBufferMsKey)
+
+    actual fun saveMaxBufferMs(value: Int) = saveStoredInt(maxBufferMsKey, value)
+
+    actual fun loadBufferForPlaybackMs(): Int? = loadStoredInt(bufferForPlaybackMsKey)
+
+    actual fun saveBufferForPlaybackMs(value: Int) = saveStoredInt(bufferForPlaybackMsKey, value)
+
+    actual fun loadBufferForPlaybackAfterRebufferMs(): Int? = loadStoredInt(bufferForPlaybackAfterRebufferMsKey)
+
+    actual fun saveBufferForPlaybackAfterRebufferMs(value: Int) = saveStoredInt(bufferForPlaybackAfterRebufferMsKey, value)
+
+    actual fun loadBackBufferDurationMs(): Int? = loadStoredInt(backBufferDurationMsKey)
+
+    actual fun saveBackBufferDurationMs(value: Int) = saveStoredInt(backBufferDurationMsKey, value)
+
+    actual fun loadTargetBufferSizeMb(): Int? = loadStoredInt(targetBufferSizeMbKey)
+
+    actual fun saveTargetBufferSizeMb(value: Int) = saveStoredInt(targetBufferSizeMbKey, value)
+
+    private fun loadStoredInt(keyBase: String): Int? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(keyBase)
+            if (sharedPreferences.contains(key)) sharedPreferences.getInt(key, 0) else null
+        }
+
+    private fun saveStoredInt(keyBase: String, value: Int) {
+        preferences?.edit()?.putInt(ProfileScopedKey.of(keyBase), value)?.apply()
+    }
+
     actual fun loadStreamAutoPlayMode(): String? =
         preferences?.getString(ProfileScopedKey.of(streamAutoPlayModeKey), null)
 
@@ -1054,6 +1157,21 @@ actual object PlayerSettingsStorage {
             ?.apply()
     }
 
+    actual fun loadPreloadNextEpisodeSources(): Boolean? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(preloadNextEpisodeSourcesKey)
+            if (sharedPreferences.contains(key)) {
+                sharedPreferences.getBoolean(key, false)
+            } else null
+        }
+
+    actual fun savePreloadNextEpisodeSources(enabled: Boolean) {
+        preferences
+            ?.edit()
+            ?.putBoolean(ProfileScopedKey.of(preloadNextEpisodeSourcesKey), enabled)
+            ?.apply()
+    }
+
     actual fun loadUseLibass(): Boolean? =
         preferences?.let { sharedPreferences ->
             val key = ProfileScopedKey.of(useLibassKey)
@@ -1260,6 +1378,7 @@ actual object PlayerSettingsStorage {
         loadNextEpisodeThresholdMode()?.let { put(nextEpisodeThresholdModeKey, encodeSyncString(it)) }
         loadNextEpisodeThresholdPercent()?.let { put(nextEpisodeThresholdPercentKey, encodeSyncFloat(it)) }
         loadNextEpisodeThresholdMinutesBeforeEnd()?.let { put(nextEpisodeThresholdMinutesBeforeEndKey, encodeSyncFloat(it)) }
+        loadPreloadNextEpisodeSources()?.let { put(preloadNextEpisodeSourcesKey, encodeSyncBoolean(it)) }
         loadUseLibass()?.let { put(useLibassKey, encodeSyncBoolean(it)) }
         loadLibassRenderType()?.let { put(libassRenderTypeKey, encodeSyncString(it)) }
         loadIosVideoOutputPreset()?.let { put(iosVideoOutputPresetKey, encodeSyncString(it)) }
@@ -1342,6 +1461,7 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncString(nextEpisodeThresholdModeKey)?.let(::saveNextEpisodeThresholdMode)
         payload.decodeSyncFloat(nextEpisodeThresholdPercentKey)?.let(::saveNextEpisodeThresholdPercent)
         payload.decodeSyncFloat(nextEpisodeThresholdMinutesBeforeEndKey)?.let(::saveNextEpisodeThresholdMinutesBeforeEnd)
+        payload.decodeSyncBoolean(preloadNextEpisodeSourcesKey)?.let(::savePreloadNextEpisodeSources)
         payload.decodeSyncBoolean(useLibassKey)?.let(::saveUseLibass)
         payload.decodeSyncString(libassRenderTypeKey)?.let(::saveLibassRenderType)
         payload.decodeSyncString(iosVideoOutputPresetKey)?.let(::saveIosVideoOutputPreset)
