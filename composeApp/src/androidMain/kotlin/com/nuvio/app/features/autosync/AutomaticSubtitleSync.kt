@@ -23,6 +23,8 @@ import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.roundToLong
 
+internal val autoSyncCpuDispatcher = Dispatchers.Default.limitedParallelism(2)
+
 /**
  * Android-only AutoSync V2.
  *
@@ -459,7 +461,7 @@ internal object AutomaticSubtitleSync {
 
             if (referenceTracks.size >= 3) {
                 val consistencyContext = currentCoroutineContext()
-                val outliers = withContext(Dispatchers.Default) {
+                val outliers = withContext(autoSyncCpuDispatcher) {
                     AutoSyncReferenceConsistency.findOutliers(
                         references = referenceTracks.mapNotNull { track ->
                             preparedReferenceActivity(track, referenceActivityCache)?.let {
@@ -625,12 +627,12 @@ internal object AutomaticSubtitleSync {
                     return
                 }
 
-                val targetActivity = withContext(Dispatchers.Default) {
+                val targetActivity = withContext(autoSyncCpuDispatcher) {
                     AutoSyncTimelineRetimer.prepareUnitActivity(loaded.cues)
                 }
 
                 val preflightResult = if (targetActivity != null) {
-                    withContext(Dispatchers.Default) {
+                    withContext(autoSyncCpuDispatcher) {
                         AutoSyncDelayPreflight.evaluate(
                             referenceTracks = referenceTracks,
                             target = loaded.cues,
@@ -647,7 +649,7 @@ internal object AutomaticSubtitleSync {
                 }
                 val preflight = preflightResult.best
 
-                val rankedReferences = withContext(Dispatchers.Default) {
+                val rankedReferences = withContext(autoSyncCpuDispatcher) {
                     rankReferenceCandidates(
                         target = loaded.cues,
                         referenceTracks = referenceTracks,
@@ -706,7 +708,7 @@ internal object AutomaticSubtitleSync {
 
                     val jobId = nextPairJobId++
                     activePairPriorities[jobId] = hypothesis.schedulingScore
-                    activePairJobs[jobId] = async(Dispatchers.Default) {
+                    activePairJobs[jobId] = async(autoSyncCpuDispatcher) {
                         val representative = hypothesis.family.representative
                         val evaluation = evaluatePair(
                             label =
@@ -765,7 +767,7 @@ internal object AutomaticSubtitleSync {
                     val target = family.representative.loaded.cues
                     val preflightResult =
                         if (family.targetActivity != null) {
-                            withContext(Dispatchers.Default) {
+                            withContext(autoSyncCpuDispatcher) {
                                 AutoSyncDelayPreflight.evaluate(
                                     referenceTracks = forcedFallbackTracks,
                                     target = target,
@@ -781,7 +783,7 @@ internal object AutomaticSubtitleSync {
                             )
                         }
                     val preflight = preflightResult.best
-                    val rankedReferences = withContext(Dispatchers.Default) {
+                    val rankedReferences = withContext(autoSyncCpuDispatcher) {
                         rankReferenceCandidates(
                             target = target,
                             referenceTracks = forcedFallbackTracks,
@@ -1079,7 +1081,7 @@ internal object AutomaticSubtitleSync {
         preflightEvidence: AutoSyncTimelineRetimer.DelayOnlySearchEvidence? = null,
         allowPrecomputedDelayFastPath: Boolean = false,
         preparedTargetActivity: AutoSyncTimelineRetimer.PreparedActivity? = null,
-    ): PairEvaluation = withContext(Dispatchers.Default) {
+    ): PairEvaluation = withContext(autoSyncCpuDispatcher) {
         val evaluationContext = currentCoroutineContext()
         val targetActivity =
             preparedTargetActivity ?: AutoSyncTimelineRetimer.prepareUnitActivity(target)
@@ -1380,7 +1382,7 @@ internal object AutomaticSubtitleSync {
         }
         val cues = try {
             val parseAndNormalize: suspend () -> List<SubtitleSyncCue> = {
-                withContext(Dispatchers.Default) {
+                withContext(autoSyncCpuDispatcher) {
                     val parseContext = currentCoroutineContext()
                     val parsed = AutoSyncSubtitleCueParser.parse(
                         text = text,

@@ -44,7 +44,7 @@ internal suspend fun applyAutoSyncSidecarTimeline(
         }
     } ?: return false
 
-    val retimed = withContext(Dispatchers.Default) {
+    val retimed = withContext(autoSyncCpuDispatcher) {
         retimeSidecarTimedCues(current, timeline)
     }
 
@@ -76,14 +76,14 @@ internal suspend fun replaceAutoSyncSidecarSubtitle(
         val body = rawBody ?: withContext(Dispatchers.IO) {
             httpGetTextWithHeaders(url = url, headers = headers)
         }
-        val parsed = withContext(Dispatchers.Default) {
+        val parsed = withContext(autoSyncCpuDispatcher) {
             parseSidecarTimedCuesRobust(body, url).cues
         }
         if (parsed.isEmpty()) {
             return false
         }
 
-        val prepared = withContext(Dispatchers.Default) {
+        val prepared = withContext(autoSyncCpuDispatcher) {
             retimeSidecarTimedCues(parsed, timeline)
         }
         prepared
