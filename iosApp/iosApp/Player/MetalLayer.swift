@@ -1,7 +1,29 @@
 import Foundation
 import UIKit
+import CoreVideo
 
 class MetalLayer: CAMetalLayer {
+    weak var pictureInPictureSink: PlayerPictureInPictureController?
+    private let pictureInPictureLock = NSLock()
+    private var consumesVideo = false
+
+    @objc var nuvioPiPConsumesVideo: Bool {
+        get {
+            pictureInPictureLock.lock()
+            defer { pictureInPictureLock.unlock() }
+            return consumesVideo
+        }
+        set {
+            pictureInPictureLock.lock()
+            consumesVideo = newValue
+            pictureInPictureLock.unlock()
+        }
+    }
+
+    @objc func nuvioEnqueuePiPFrame(_ pixelBuffer: CVPixelBuffer, presentationTime: Double, isPictureInPictureFrame: Bool) {
+        pictureInPictureSink?.submit(pixelBuffer, pts: presentationTime, isPictureInPictureFrame: isPictureInPictureFrame)
+    }
+
     override var drawableSize: CGSize {
         get { return super.drawableSize }
         set {
