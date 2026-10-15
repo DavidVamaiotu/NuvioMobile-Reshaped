@@ -344,6 +344,10 @@ final class MPVPlayerViewController: UIViewController {
         refreshImmersiveSystemUI()
     }
 
+    func setPictureInPicturePlaceholderVisible(_ visible: Bool) {
+        SystemUI.shared.setPictureInPicturePlaceholder(self, visible: visible)
+    }
+
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         refreshImmersiveSystemUI()
@@ -561,15 +565,23 @@ final class MPVPlayerViewController: UIViewController {
     @objc private func enterBackground() {
         guard mpv != nil else { return }
         if pictureInPictureController?.enteredBackground() == true { return }
+        pauseBackgroundPlayback()
+    }
+
+    func pauseBackgroundPlayback() {
         pausePlayback()
         setStringProperty("vid", "no")
+    }
+
+    func restoreBackgroundVideo() {
+        setStringProperty("vid", "auto")
     }
 
     @objc private func enterForeground() {
         guard mpv != nil else { return }
         let wasInPictureInPicture = pictureInPictureController?.enteredForeground() == true
         if wasInPictureInPicture { return }
-        setStringProperty("vid", "auto")
+        restoreBackgroundVideo()
         playPlayback()
     }
 
