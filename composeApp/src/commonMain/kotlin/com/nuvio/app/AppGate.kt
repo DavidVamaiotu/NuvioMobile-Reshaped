@@ -157,9 +157,14 @@ internal fun AppGate(
         false
     }
 
+    fun reportAppReady(ready: Boolean) {
+        appGateController?.reportAppReady(ready)
+        onAppReady?.invoke(ready)
+    }
+
     LaunchedEffect(gateScreen, onAppReady) {
         if (gateScreen != AppGateScreen.Main.name) {
-            onAppReady?.invoke(false)
+            reportAppReady(false)
         }
     }
 
@@ -401,7 +406,7 @@ internal fun AppGate(
                 !profileOverlayState.currentState &&
                 launchOverlayState.isIdle &&
                 !launchOverlayState.currentState
-        onAppReady?.invoke(
+        reportAppReady(
             gateScreen == AppGateScreen.Main.name &&
                 externalMainContentReady &&
                 !profileSelectionLoading &&

@@ -224,8 +224,9 @@ open class MainActivity : AppCompatActivity() {
     }
 
     private fun handleIncomingAppIntent(intent: Intent?) {
-        if (LiveTvIncomingIntent.accept(this, intent)) return
-        val appUrl = intent?.dataString?.trim().orEmpty()
+        val incomingIntent = intent?.getParcelableExtra<Intent>(LinkActivity.EXTRA_INCOMING_INTENT) ?: intent
+        if (LiveTvIncomingIntent.accept(this, incomingIntent)) return
+        val appUrl = (incomingIntent?.dataString ?: intent?.getStringExtra(LinkActivity.EXTRA_LINK))?.trim().orEmpty()
         if (appUrl.isBlank()) return
         handleAppUrl(appUrl)
     }
