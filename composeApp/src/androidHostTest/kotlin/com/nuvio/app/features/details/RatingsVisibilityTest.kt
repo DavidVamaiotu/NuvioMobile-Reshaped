@@ -133,8 +133,8 @@ class RatingsVisibilityTest {
                     title = meta.name,
                     seasonNumber = 1,
                     episodeNumber = 1,
-                    lastPositionMs = 950,
-                    durationMs = 1000,
+                    lastPositionMs = 950_000,
+                    durationMs = 1_000_000,
                     lastUpdatedEpochMs = 1,
                 ))
             }

@@ -769,7 +769,7 @@ internal fun StreamList(
                         showAddonLogo = streamBadgeSettings.showAddonLogo,
                         badgePlacement = streamBadgeSettings.badgePlacement,
                         onClick = { onStreamSelected(shared.stream, resumePositionMs, resumeProgressFraction) },
-                        isCurrent = true,
+                        outlined = true,
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                 }

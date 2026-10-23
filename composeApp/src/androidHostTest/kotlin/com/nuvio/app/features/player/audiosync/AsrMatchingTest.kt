@@ -75,7 +75,9 @@ class AsrMatchingTest {
         val order = java.util.Collections.synchronizedList(ArrayList<Int>())
         val done = java.util.concurrent.CountDownLatch(6)
         val engine = AsrSyncEngine(SpeechTimeline(), onLock = {})
-        engine.startSession(SubtitleSpeechTrack.fromCues(script(Random(6), 30)), emptyList())
+        val cues = script(Random(6), 30)
+        val track = SubtitleSpeechTrack.fromCues(cues)
+        engine.startSession(track, listOf(com.nuvio.app.features.player.audiosync.asr.ReferenceSubtitle("en", cues, null)))
         fun segment(frame: Int) = FloatArray(SileroVad.CHUNK_SAMPLES * 10) { frame.toFloat() }
         engine.onPlayhead(0L)
         listOf(100, 200, 300).forEach { engine.offerSegment(it, segment(it)) }
@@ -86,8 +88,11 @@ class AsrMatchingTest {
             done.countDown()
             emptyList()
         }
-        assertTrue(done.await(5, java.util.concurrent.TimeUnit.SECONDS))
-        engine.release()
+        try {
+            assertTrue(done.await(5, java.util.concurrent.TimeUnit.SECONDS))
+        } finally {
+            engine.release()
+        }
         assertEquals(listOf(56_000, 112_000, 56_100, 100, 200, 300), order.toList())
     }
 

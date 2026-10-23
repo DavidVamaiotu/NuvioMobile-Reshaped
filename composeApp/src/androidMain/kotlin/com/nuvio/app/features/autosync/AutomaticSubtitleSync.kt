@@ -175,6 +175,8 @@ internal object AutomaticSubtitleSync {
         onReferenceSearchOutcome: ((AutoSyncReferenceSearchOutcome) -> Unit)? = null,
         /** A follow-up search in another language: log into the current debug session. */
         continueDebugSession: Boolean = false,
+        /** False when the player does not feed [EmbeddedSubtitleCueStore] (libmpv): indexed references only. */
+        allowLiveReference: Boolean = true,
     ): AutoSyncResolvedTimeline? {
         AutoSyncPreferencesRepository.ensureLoaded()
         val aggressiveMode = AutoSyncPreferencesRepository.aggressiveMode.value
@@ -629,7 +631,8 @@ internal object AutomaticSubtitleSync {
 
             if (
                 referenceTracks.isEmpty() &&
-                requiredReferenceSource != AutoSyncReferenceSource.INDEXED
+                requiredReferenceSource != AutoSyncReferenceSource.INDEXED &&
+                allowLiveReference
             ) {
                 val liveSelection = awaitNearCompleteLiveReferences(
                     sourceKey = sourceKey,
