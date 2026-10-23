@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Merges official Nuvio (<target>: a commit, branch or tag already fetched) into the current
 # branch, committing it as <message>. A real merge records upstream history, so each sync only
-# brings in what changed since the last one. The fork's own workflows always win.
+# brings in what changed since the last one. The fork's README and workflows always win.
 #
 # Upstream used to be copied in as patches, with the last synced commit recorded in
 # .github/nuvio-upstream-base. The first merge records that commit as merged without changing
@@ -40,8 +40,9 @@ git merge --no-ff --no-commit "$TARGET"
 MERGE_STATUS=$?
 set -e
 
+# Preserve fork documentation even when upstream changes merge without a conflict.
 # Fork-owned workflows always win (upstream's own are not brought in).
-git restore --source=HEAD --staged --worktree .github/workflows
+git restore --source=HEAD --staged --worktree README.md .github/workflows
 
 if (( MERGE_STATUS != 0 )); then
   mapfile -t CONFLICTS < <(git diff --name-only --diff-filter=U)

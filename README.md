@@ -1,11 +1,11 @@
 <div align="center">
 
-  <img src="branding/nuvio-rs-logo.png" alt="Nuvio Reshaped" width="128" />
+  <img src="branding/nuvio-rs-logo.png" alt="NuvioTV Reshaped Mobile" width="128" />
 
-  <h1>Nuvio Reshaped</h1>
+  <h1>NuvioTV Reshaped — Mobile</h1>
 
   <p>
-    A community fork of <a href="https://github.com/NuvioMedia/NuvioMobile">Nuvio Mobile</a> for Android phones and tablets.
+    The Android phone and tablet edition of <a href="https://github.com/DavidVamaiotu/NuvioTV-Reshaped">NuvioTV Reshaped</a>, a community fork of <a href="https://github.com/NuvioMedia/NuvioMobile">Nuvio Mobile</a>.
     <br />
     Everything you know from Nuvio, plus subtitles that sync themselves, instant seeking with previews, Live TV and a calmer, more cinematic player.
   </p>
@@ -13,6 +13,10 @@
   [Download](https://github.com/DavidVamaiotu/NuvioMobile-Reshaped/releases/latest) · [All releases](https://github.com/DavidVamaiotu/NuvioMobile-Reshaped/releases) · [TV version](https://github.com/DavidVamaiotu/NuvioTV-Reshaped) · [Official Nuvio](https://nuvio.tv)
 
 </div>
+
+## About this fork
+
+This repository contains the mobile edition of NuvioTV Reshaped, also known in the app as **Nuvio Reshaped** or **Nuvio RS**. For the Android TV app, use [NuvioTV Reshaped](https://github.com/DavidVamaiotu/NuvioTV-Reshaped). The features below apply to the mobile edition.
 
 ## What's different from Nuvio
 
@@ -63,3 +67,9 @@ Nuvio Reshaped is built on [Nuvio](https://nuvio.tv) by the [NuvioMedia](https:/
 ## License
 
 [GNU General Public License v3.0](./LICENSE), the same as upstream Nuvio.
+
+## Maintaining the fork README
+
+`README.md` belongs to NuvioTV Reshaped. Keep its fork branding, platform details, downloads and upstream credits when updating it. Do not replace it with upstream documentation during syncs, releases or branch merges.
+
+Use `.github/scripts/merge-nuvio-upstream.sh <target> "<message>"` for upstream merges after fetching the target. It preserves this README and the fork workflows, including when upstream README changes would merge cleanly. The README branding workflow checks future pushes and pull requests for accidental reversions.
