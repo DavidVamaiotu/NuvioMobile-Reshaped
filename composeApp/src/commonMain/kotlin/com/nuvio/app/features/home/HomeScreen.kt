@@ -140,6 +140,7 @@ fun HomeScreen(
 
     val addonsUiState by AddonRepository.uiState.collectAsStateWithLifecycle()
     val homeUiState by HomeRepository.uiState.collectAsStateWithLifecycle()
+    val homeHeroState = rememberHomeHeroState(homeUiState.heroItems)
     val homeSettingsUiState by remember {
         HomeCatalogSettingsRepository.snapshot()
         HomeCatalogSettingsRepository.uiState
@@ -1005,12 +1006,14 @@ fun HomeScreen(
                             )
 
                             homeUiState.heroItems.isNotEmpty() -> HomeHeroSection(
-                                items = homeUiState.heroItems,
+                                items = homeHeroState.items,
                                 modifier = Modifier,
                                 viewportHeight = maxHeight,
                                 mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
                                 listState = homeListState,
                                 stretchPx = { heroStretchState.stretchPx },
+                                showImdbRating = homeHeroState.showImdbRating,
+                                showMdbListRatings = homeHeroState.showMdbListRatings,
                                 onItemClick = onPosterClick,
                             )
 

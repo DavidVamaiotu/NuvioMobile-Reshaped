@@ -941,6 +941,8 @@
     <string name="settings_mdb_section_api_key">API KEY</string>
     <string name="settings_mdb_section_rating_providers">EXTERNAL RATINGS PROVIDERS</string>
     <string name="settings_mdb_section_title">MDBList RATINGS</string>
+    <string name="settings_mdb_show_on_hero">Use Ratings on Hero</string>
+    <string name="settings_mdb_show_on_hero_description">Show MDBList ratings on the home hero</string>
     <string name="settings_meta_actions">Actions</string>
     <string name="settings_meta_actions_description">Play and save controls.</string>
     <string name="settings_meta_cast">Cast</string>

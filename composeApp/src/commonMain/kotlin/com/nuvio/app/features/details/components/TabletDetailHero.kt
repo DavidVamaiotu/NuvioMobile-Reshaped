@@ -418,10 +418,7 @@ private fun TabletHeroMetaRow(meta: MetaDetails, showImdbRating: Boolean) {
         }
         if (validImdbRating != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                ImdbRatingSourceLabel(
-                    storeTextStyle = itemStyle,
-                    storeTextColor = ImdbYellow,
-                )
+                ImdbRatingSourceLabel(storeTextStyle = itemStyle)
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = validImdbRating,
