@@ -18,29 +18,21 @@
 
 This repository contains the mobile edition of NuvioTV Reshaped, also known in the app as **Nuvio Reshaped** or **Nuvio RS**. For the Android TV app, use [NuvioTV Reshaped](https://github.com/DavidVamaiotu/NuvioTV-Reshaped). The features below apply to the mobile edition.
 
-## What Reshaped adds on mobile
+## Reshaped settings
 
-The additions below belong to the mobile fork. Configure them under **Settings > Nuvio Reshaped**. They are separate from the TV edition’s anime-tracker additions.
+Open **Settings > Nuvio Reshaped**. The options on this page are:
 
-### Subtitles
-
-- **Subtitle AutoSync.** When playback starts, your preferred add-on subtitle is compared against the stream's embedded subtitles and shifted into place automatically. Only confident matches are applied. Choose a Quick or Thorough search, set a tolerance, and tap *Try another reference* if the timing is still off.
-- **Sync to audio.** When there's nothing to compare against, AutoSync can align the subtitle by listening to the dialogue. An optional on-device speech model (downloaded once, Wi-Fi recommended) makes this faster and more precise for English audio.
-- **AutoSync for a second language.** Apply automatic timing alignment to a secondary subtitle language as well as the primary one.
-- **Bubble notifications.** Optional liquid-glass bubble that shows AutoSync progress and results at the bottom of the player instead of plain toasts.
-- **Custom subtitle fonts.** Import any `.ttf` or `.otf` file and use it for subtitles.
-
-### Player
-
-- **Seek previews.** Shows a thumbnail filmstrip while you scrub. It generates previews on the device from the current video and can use Seekr previews to fill gaps.
-- **Seek buffer.** Adds an optional disk buffer (256 MB, 512 MB or 1 GB). Seeking within buffered video can avoid waiting for the network to fetch it again. The temporary buffer is cleared when the player closes.
-- **Volume boost.** The swipe volume bar goes up to 200% for quiet films, with a red tint above 100%. It resets when the player closes.
-
-### Browsing
-
-- **Pill navigation.** An optional floating liquid-glass pill for Home, Search, Library, Settings and your profile, which hides as you scroll.
-- **Streams that fit your connection.** Learns your real playback speed and moves streams that are likely too heavy further down, keeping your add-on's order otherwise.
-- **Live TV.** Add M3U, Xtream or Stalker playlists and watch live channels with a programme guide, in Nuvio's own player.
+- **Sync with Google.** Sync Reshaped settings and Live TV with your phone and TVs. Choose settings sync and Live TV sync separately, or use **Sync now**. Buffer size and volume boost stay per device.
+- **Live TV.** Enable the Live TV tab, where you can add M3U, Xtream or Stalker sources and browse channels with a programme guide.
+- **Library calendar.** Enable a calendar of saved movies and episode releases with exact dates.
+- **Subtitle AutoSync.** Align an add-on subtitle with embedded subtitles. Configure search thoroughness, timing tolerance and audio-based alignment, including the optional on-device English speech model.
+- **AutoSync bubble notifications.** Show AutoSync progress and results in an optional bubble.
+- **Custom subtitle font.** Import a `.ttf` or `.otf` font for subtitles, or reset to the default.
+- **Volume boost.** Allow the player volume control to reach 200%. The boost resets when the player closes.
+- **Seek buffer.** Choose a temporary disk buffer of 256 MB, 512 MB or 1 GB to reduce network waits when seeking within buffered video.
+- **Seek previews.** Enable thumbnails while scrubbing through video.
+- **Pill menu.** Enable the floating navigation menu.
+- **Streams that fit your connection.** Use measured playback speed to move streams likely to exceed your connection speed further down the list.
 
 ## Get it
 
@@ -70,6 +62,6 @@ Nuvio Reshaped is built on [Nuvio](https://nuvio.tv) by the [NuvioMedia](https:/
 
 ## Maintaining the fork README
 
-`README.md` belongs to NuvioTV Reshaped. Keep its fork branding, platform details, downloads and upstream credits when updating it. Describe only additions verified against the upstream version this branch builds on; keep upstream features out of the Reshaped feature list. Do not replace it with upstream documentation during syncs, releases or branch merges.
+`README.md` belongs to NuvioTV Reshaped. Keep its fork branding, platform details, downloads and upstream credits when updating it. The feature list must describe only controls present in **Settings > Nuvio Reshaped**. Do not add general Nuvio features or integrations from other settings pages. Do not replace it with upstream documentation during syncs, releases or branch merges.
 
 Use `.github/scripts/merge-nuvio-upstream.sh <target> "<message>"` for upstream merges after fetching the target. It preserves this README and the fork workflows, including when upstream README changes would merge cleanly. The README branding workflow checks future pushes and pull requests for accidental reversions.
