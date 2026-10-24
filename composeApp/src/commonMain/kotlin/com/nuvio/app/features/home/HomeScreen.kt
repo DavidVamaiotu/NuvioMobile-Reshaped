@@ -27,6 +27,8 @@ import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.ui.LocalNuvioBottomNavigationOverlayPadding
+import com.nuvio.app.core.ui.LocalVerticalBarPadding
+import com.nuvio.app.core.ui.nuvioHorizontalScrollBleed
 import com.nuvio.app.core.ui.ScreenActivityEffect
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
@@ -995,6 +997,7 @@ fun HomeScreen(
                 item(key = "home_hero", contentType = "hero") {
                     Crossfade(
                         targetState = showHeroSkeleton,
+                        modifier = Modifier.nuvioHorizontalScrollBleed(LocalVerticalBarPadding.current),
                         animationSpec = tween(320),
                         label = "HomeHeroLoading",
                     ) { isLoading ->
