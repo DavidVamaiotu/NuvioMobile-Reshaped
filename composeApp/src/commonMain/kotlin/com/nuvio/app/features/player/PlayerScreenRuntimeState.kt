@@ -169,6 +169,11 @@ internal class PlayerScreenRuntime(
 
     var showSourcesPanel by mutableStateOf(false)
     var showEpisodesPanel by mutableStateOf(false)
+    var showChaptersPanel by mutableStateOf(false)
+    /** The file's chapters, sorted; empty when it has fewer than two. */
+    var chapters by mutableStateOf<List<PlayerChapter>>(emptyList())
+    /** The source whose chapters [chapters] holds, so a rebuffer does not read them again. */
+    var chaptersLoadedForSourceUrl: String? = null
     var showSubmitIntroModal by mutableStateOf(false)
     var showSwitchEngineConfirm by mutableStateOf(false)
     var submitIntroSegmentType by mutableStateOf("intro")
@@ -206,6 +211,10 @@ internal class PlayerScreenRuntime(
     var showStreamInfo by mutableStateOf(false)
     var showPartyPanel by mutableStateOf(false)
     var showPartyChat by mutableStateOf(false)
+    val isPanelOpen: Boolean
+        get() = showAudioModal || showSubtitleModal || showVideoSettingsModal || showStreamInfo ||
+            showPartyPanel || showSourcesPanel || showEpisodesPanel || showChaptersPanel ||
+            showReshapedLiveTvChannelsPanel || seekPreview.showSyncPanel || showSubmitIntroModal
     var partyBehind by mutableStateOf(false)
     var partyBehindMs by mutableStateOf<Long?>(null)
     var partyRateNudge: Float? = null

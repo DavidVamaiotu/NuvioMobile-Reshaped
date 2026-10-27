@@ -1,2 +1,2 @@
-- Updated to upstream Nuvio 0.6.4-beta, including the new libass subtitle renderer, dual-screen layout fixes, translation updates, and Nuvio engine 0.1.6.
-- Kept Reshaped settings, AutoSync/AudioSync, seek previews, subtitle retry notices, stream filters, and network controls. Existing preferences remain in place.
+- Updated to upstream Nuvio 0.6.5-beta, including chapter navigation, half-open foldable playback controls, media-server title lookup fixes, language detection improvements, and translations.
+- Kept Reshaped settings, AutoSync/AudioSync, seek previews, Live TV channel controls, and network monitoring. Seek-preview ticks and chapter markers work together, and Reshaped actions remain available in the folded layout.
