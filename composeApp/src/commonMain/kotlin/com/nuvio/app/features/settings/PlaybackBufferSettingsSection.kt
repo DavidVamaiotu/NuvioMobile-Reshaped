@@ -9,37 +9,30 @@ import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.settings_playback_buffer_auto
 import nuvio.composeapp.generated.resources.settings_playback_buffer_default
 import nuvio.composeapp.generated.resources.settings_playback_buffer_description
-import nuvio.composeapp.generated.resources.settings_playback_buffer_section
 import nuvio.composeapp.generated.resources.settings_playback_buffer_title
 import nuvio.composeapp.generated.resources.settings_playback_buffer_value_gb
 import org.jetbrains.compose.resources.stringResource
 
 /** Seek buffer: disk cache the way Nuvio TV does it (Android players only). */
 @Composable
-internal fun PlaybackBufferSettingsSection(isTablet: Boolean) {
+internal fun PlaybackBufferSettingsRows(isTablet: Boolean, divider: Boolean = false) {
     if (isIos) return
     val bufferMb by PlaybackDiskCacheSettings.bufferMb.collectAsStateWithLifecycle()
 
-    SettingsSection(
-        title = stringResource(Res.string.settings_playback_buffer_section),
+    if (divider) SettingsGroupDivider(isTablet = isTablet)
+    SettingsNavigationRow(
+        title = stringResource(
+            Res.string.settings_playback_buffer_title,
+            when (bufferMb) {
+                PlaybackDiskCacheSettings.NUVIO_DEFAULT_MB ->
+                    stringResource(Res.string.settings_playback_buffer_default)
+                PlaybackDiskCacheSettings.AUTO_MB ->
+                    stringResource(Res.string.settings_playback_buffer_auto)
+                else -> stringResource(Res.string.settings_playback_buffer_value_gb, bufferMb / 1024)
+            },
+        ),
+        description = stringResource(Res.string.settings_playback_buffer_description),
         isTablet = isTablet,
-    ) {
-        SettingsGroup(isTablet = isTablet) {
-            SettingsNavigationRow(
-                title = stringResource(
-                    Res.string.settings_playback_buffer_title,
-                    when (bufferMb) {
-                        PlaybackDiskCacheSettings.NUVIO_DEFAULT_MB ->
-                            stringResource(Res.string.settings_playback_buffer_default)
-                        PlaybackDiskCacheSettings.AUTO_MB ->
-                            stringResource(Res.string.settings_playback_buffer_auto)
-                        else -> stringResource(Res.string.settings_playback_buffer_value_gb, bufferMb / 1024)
-                    },
-                ),
-                description = stringResource(Res.string.settings_playback_buffer_description),
-                isTablet = isTablet,
-                onClick = PlaybackDiskCacheSettings::cycle,
-            )
-        }
-    }
+        onClick = PlaybackDiskCacheSettings::cycle,
+    )
 }

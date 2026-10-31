@@ -53,10 +53,6 @@ internal fun AutoSyncPlaybackSettingsRows(
         AutoSyncPreferencesRepository.ensureLoaded()
         AutoSyncPreferencesRepository.aggressiveMode
     }.collectAsStateWithLifecycle()
-    val debugLogsEnabled by remember {
-        AutoSyncPreferencesRepository.ensureLoaded()
-        AutoSyncPreferencesRepository.debugLogsEnabled
-    }.collectAsStateWithLifecycle()
     val syncToleranceMs by remember {
         AutoSyncPreferencesRepository.ensureLoaded()
         AutoSyncPreferencesRepository.syncToleranceMs
@@ -135,17 +131,6 @@ internal fun AutoSyncPlaybackSettingsRows(
             AutoSyncPreferencesRepository.setSyncToleranceMs(next)
         },
     )
-    SettingsGroupDivider(isTablet = isTablet)
-    SettingsSwitchRow(
-        title = stringResource(Res.string.settings_playback_auto_sync_debug_logs),
-        description = stringResource(
-            Res.string.settings_playback_auto_sync_debug_logs_description,
-        ),
-        checked = debugLogsEnabled,
-        enabled = enabled,
-        isTablet = isTablet,
-        onCheckedChange = AutoSyncPreferencesRepository::setDebugLogsEnabled,
-    )
     AudioSyncFallbackSettingsRows(isTablet = isTablet, enabled = enabled && preferredSubtitleAutoSyncOnStart)
 }
 
@@ -154,7 +139,6 @@ internal fun AutoSyncPlaybackSettingsRows(
 private fun AudioSyncFallbackSettingsRows(isTablet: Boolean, enabled: Boolean) {
     val fallbackEnabled by AudioSyncSettings.fallbackEnabled.collectAsStateWithLifecycle()
     val samplingOnMobileData by AudioSyncSettings.samplingOnMobileData.collectAsStateWithLifecycle()
-    val showStatistics by AudioSyncSettings.showStatistics.collectAsStateWithLifecycle()
     val speechModel by SubtitleSyncStatus.speechModel.collectAsStateWithLifecycle()
 
     SettingsGroupDivider(isTablet = isTablet)
@@ -199,6 +183,35 @@ private fun AudioSyncFallbackSettingsRows(isTablet: Boolean, enabled: Boolean) {
         enabled = active,
         isTablet = isTablet,
         onCheckedChange = AudioSyncSettings::setSamplingOnMobileData,
+    )
+}
+
+/** AutoSync and audio sync debug rows, shown in the Diagnostics section of the Nuvio Reshaped page. */
+@Composable
+internal fun AutoSyncDiagnosticsSettingsRows(isTablet: Boolean, enabled: Boolean) {
+    val preferredSubtitleAutoSyncOnStart by remember {
+        AutoSyncPreferencesRepository.ensureLoaded()
+        AutoSyncPreferencesRepository.preferredSubtitleAutoSyncOnStart
+    }.collectAsStateWithLifecycle()
+    val debugLogsEnabled by remember {
+        AutoSyncPreferencesRepository.ensureLoaded()
+        AutoSyncPreferencesRepository.debugLogsEnabled
+    }.collectAsStateWithLifecycle()
+    val fallbackEnabled by AudioSyncSettings.fallbackEnabled.collectAsStateWithLifecycle()
+    val showStatistics by AudioSyncSettings.showStatistics.collectAsStateWithLifecycle()
+
+    if (isIos) return
+
+    val active = enabled && preferredSubtitleAutoSyncOnStart && fallbackEnabled
+    SettingsSwitchRow(
+        title = stringResource(Res.string.settings_playback_auto_sync_debug_logs),
+        description = stringResource(
+            Res.string.settings_playback_auto_sync_debug_logs_description,
+        ),
+        checked = debugLogsEnabled,
+        enabled = enabled,
+        isTablet = isTablet,
+        onCheckedChange = AutoSyncPreferencesRepository::setDebugLogsEnabled,
     )
     SettingsGroupDivider(isTablet = isTablet)
     SettingsSwitchRow(

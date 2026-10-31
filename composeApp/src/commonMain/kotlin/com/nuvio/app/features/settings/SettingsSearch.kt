@@ -53,12 +53,11 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import nuvio.composeapp.generated.resources.settings_autosync_bubble_toast
 import nuvio.composeapp.generated.resources.settings_autosync_bubble_toast_description
 import nuvio.composeapp.generated.resources.settings_nuvio_reshaped
-import nuvio.composeapp.generated.resources.settings_nuvio_reshaped_autosync_section
+import nuvio.composeapp.generated.resources.settings_nuvio_reshaped_subtitles_sync_section
 import nuvio.composeapp.generated.resources.settings_nuvio_reshaped_description
 import nuvio.composeapp.generated.resources.settings_playback_subtitle_auto_sync
 import nuvio.composeapp.generated.resources.settings_playback_subtitle_auto_sync_description
 import nuvio.composeapp.generated.resources.settings_seekr_api_key
-import nuvio.composeapp.generated.resources.settings_seek_preview_section
 import org.jetbrains.compose.resources.stringResource
 
 internal sealed class SettingsSearchTarget {
@@ -544,7 +543,7 @@ internal fun settingsSearchEntries(
             title = stringResource(Res.string.settings_playback_subtitle_auto_sync),
             description = stringResource(Res.string.settings_playback_subtitle_auto_sync_description),
             pageLabel = nuvioReshapedPage,
-            section = stringResource(Res.string.settings_nuvio_reshaped_autosync_section),
+            section = stringResource(Res.string.settings_nuvio_reshaped_subtitles_sync_section),
             icon = Icons.Rounded.AutoAwesome,
         )
         addRow(
@@ -553,7 +552,7 @@ internal fun settingsSearchEntries(
             title = stringResource(Res.string.settings_autosync_bubble_toast),
             description = stringResource(Res.string.settings_autosync_bubble_toast_description),
             pageLabel = nuvioReshapedPage,
-            section = stringResource(Res.string.settings_nuvio_reshaped_autosync_section),
+            section = stringResource(Res.string.settings_nuvio_reshaped_subtitles_sync_section),
             icon = Icons.Rounded.AutoAwesome,
         )
         addRow(
@@ -561,7 +560,7 @@ internal fun settingsSearchEntries(
             key = "nuvio-reshaped-seekr-key",
             title = stringResource(Res.string.settings_seekr_api_key),
             pageLabel = nuvioReshapedPage,
-            section = stringResource(Res.string.settings_seek_preview_section),
+            section = playbackPage,
             icon = Icons.Rounded.AutoAwesome,
         )
     }

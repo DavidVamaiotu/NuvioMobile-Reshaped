@@ -34,7 +34,6 @@ import nuvio.composeapp.generated.resources.action_cancel
 import nuvio.composeapp.generated.resources.action_save
 import nuvio.composeapp.generated.resources.settings_seek_preview_local
 import nuvio.composeapp.generated.resources.settings_seek_preview_local_description
-import nuvio.composeapp.generated.resources.settings_seek_preview_section
 import nuvio.composeapp.generated.resources.settings_seekr_api_key
 import nuvio.composeapp.generated.resources.settings_seekr_api_key_builtin
 import nuvio.composeapp.generated.resources.settings_seekr_api_key_custom
@@ -44,36 +43,30 @@ import org.jetbrains.compose.resources.stringResource
 
 /** Seek previews (Seekr): lets users use their own API key instead of the shared built-in one. */
 @Composable
-internal fun SeekPreviewSettingsSection(isTablet: Boolean) {
+internal fun SeekPreviewSettingsRows(isTablet: Boolean, divider: Boolean = false) {
     if (isIos) return
     val userKey by SeekrKeyRepository.userKey.collectAsStateWithLifecycle()
     val localEnabled by LocalSeekPreviewSettings.enabled.collectAsStateWithLifecycle()
     var showDialog by remember { mutableStateOf(false) }
 
-    SettingsSection(
-        title = stringResource(Res.string.settings_seek_preview_section),
+    if (divider) SettingsGroupDivider(isTablet = isTablet)
+    SettingsSwitchRow(
+        title = stringResource(Res.string.settings_seek_preview_local),
+        description = stringResource(Res.string.settings_seek_preview_local_description),
+        checked = localEnabled,
         isTablet = isTablet,
-    ) {
-        SettingsGroup(isTablet = isTablet) {
-            SettingsSwitchRow(
-                title = stringResource(Res.string.settings_seek_preview_local),
-                description = stringResource(Res.string.settings_seek_preview_local_description),
-                checked = localEnabled,
-                isTablet = isTablet,
-                onCheckedChange = LocalSeekPreviewSettings::setEnabled,
-            )
-            SettingsNavigationRow(
-                title = stringResource(Res.string.settings_seekr_api_key),
-                description = if (userKey.isBlank()) {
-                    stringResource(Res.string.settings_seekr_api_key_builtin)
-                } else {
-                    stringResource(Res.string.settings_seekr_api_key_custom)
-                },
-                isTablet = isTablet,
-                onClick = { showDialog = true },
-            )
-        }
-    }
+        onCheckedChange = LocalSeekPreviewSettings::setEnabled,
+    )
+    SettingsNavigationRow(
+        title = stringResource(Res.string.settings_seekr_api_key),
+        description = if (userKey.isBlank()) {
+            stringResource(Res.string.settings_seekr_api_key_builtin)
+        } else {
+            stringResource(Res.string.settings_seekr_api_key_custom)
+        },
+        isTablet = isTablet,
+        onClick = { showDialog = true },
+    )
 
     if (showDialog) {
         SeekrApiKeyDialog(
