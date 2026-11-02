@@ -49,3 +49,11 @@ actual fun rememberSubtitleFontPicker(): SubtitleFontPickerState? {
         reset = { SubtitleFontStore.clear(context) },
     )
 }
+
+@Composable
+internal actual fun rememberReshapedSubtitleFontFamily(): androidx.compose.ui.text.font.FontFamily? {
+    val context = LocalContext.current
+    LaunchedEffect(context) { withContext(Dispatchers.IO) { SubtitleFontStore.current(context) } }
+    val font by SubtitleFontStore.font.collectAsState()
+    return remember(font) { font?.let { androidx.compose.ui.text.font.FontFamily(it.typeface) } }
+}
