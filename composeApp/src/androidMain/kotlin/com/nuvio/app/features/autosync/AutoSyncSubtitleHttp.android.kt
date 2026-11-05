@@ -11,7 +11,6 @@ import okhttp3.Response
 import okhttp3.ResponseBody
 import java.io.ByteArrayOutputStream
 import java.io.IOException
-import kotlin.text.Charsets
 
 /**
  * AutoSync-only subtitle HTTP path.
@@ -30,6 +29,7 @@ internal object AutoSyncSubtitleHttp {
         url: String,
         headers: Map<String, String>,
         maxResponseBodyBytes: Int,
+        languageHint: String? = null,
     ): RawHttpResponse {
         val requestBuilder = Request.Builder()
             .url(url)
@@ -81,6 +81,7 @@ internal object AutoSyncSubtitleHttp {
                                     body = readResponseBodyLimited(
                                         body = current.body,
                                         maxBytes = maxResponseBodyBytes,
+                                        languageHint = languageHint,
                                     ),
                                     headers = current.headers
                                         .toMultimap()
@@ -114,6 +115,7 @@ internal object AutoSyncSubtitleHttp {
     private fun readResponseBodyLimited(
         body: ResponseBody?,
         maxBytes: Int,
+        languageHint: String?,
     ): String {
         if (body == null) return ""
 
@@ -150,13 +152,9 @@ internal object AutoSyncSubtitleHttp {
             }
         }
 
-        val bytes = output.toByteArray()
-        val charset = body.contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8
-        val decoded = try {
-            String(bytes, charset)
-        } catch (_: Exception) {
-            String(bytes, Charsets.UTF_8)
-        }
+        // Addon files can use legacy encodings without declaring a charset. Detect from the
+        // bytes before decoding so accented letters are not irreversibly replaced with U+FFFD.
+        val decoded = SubtitleCharsetDetector.decode(output.toByteArray(), languageHint = languageHint)
 
         return if (truncated) "$decoded$TRUNCATION_SUFFIX" else decoded
     }

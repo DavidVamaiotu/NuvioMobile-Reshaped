@@ -13,4 +13,5 @@
     <string name="autosync_toast_retry_none">Auto Sync • No better reference found</string>
     <string name="autosync_toast_retry_failed">Auto Sync • Reference retry failed • current sync kept</string>
     <string name="autosync_label_synced">Auto synced</string>
+    <string name="autosync_toast_no_fit">Sync failed: these subtitles don’t match this version of the video.</string>
 </resources>

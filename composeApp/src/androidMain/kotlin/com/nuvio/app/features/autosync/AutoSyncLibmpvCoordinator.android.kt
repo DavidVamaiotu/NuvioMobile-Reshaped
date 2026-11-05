@@ -32,6 +32,7 @@ import nuvio.composeapp.generated.resources.autosync_toast_retry_none
 import nuvio.composeapp.generated.resources.autosync_toast_retry_synced
 import nuvio.composeapp.generated.resources.autosync_toast_synced
 import nuvio.composeapp.generated.resources.autosync_toast_synced_replaced
+import nuvio.composeapp.generated.resources.autosync_toast_no_fit
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.getString
 
@@ -241,6 +242,7 @@ internal class LibmpvAutoSyncCoordinator(
                     showFailure(token, when (outcome) {
                         AutoSyncAnalysisOutcome.NO_SUBTITLE_TRACKS,
                         AutoSyncAnalysisOutcome.NO_USABLE_REFERENCE -> Res.string.autosync_toast_failed_no_reference
+                        AutoSyncAnalysisOutcome.NO_FIT -> Res.string.autosync_toast_no_fit
                         else -> Res.string.autosync_toast_failed
                     })
                     return@launch

@@ -37,6 +37,12 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.nuvio.app.features.player.addonSubtitleTrackId
+import com.nuvio.app.features.player.getAssHandlerCompat
+import com.nuvio.tv.libass.media.AssHandler
+import androidx.media3.common.MimeTypes
+import kotlinx.coroutines.withContext
+import nuvio.composeapp.generated.resources.autosync_toast_no_fit
 import kotlinx.coroutines.launch
 
 private const val TAG = "NuvioAutoSyncPlayer"
@@ -65,6 +71,7 @@ internal class AutoSyncPlayerCoordinator(
         scope.launch { showAutoSyncMessage(context, kind, message()) }
     }
 
+    private var libassOperationToken = 0L
     private var job: Job? = null
     private var selectedBodyJob: Job? = null
     private var retryJob: Job? = null
@@ -128,6 +135,7 @@ internal class AutoSyncPlayerCoordinator(
     }
 
     fun cancel() {
+        libassOperationToken++
         audioFallback.stop()
         job?.cancel()
         job = null
@@ -143,6 +151,7 @@ internal class AutoSyncPlayerCoordinator(
      */
     fun attachWithoutAutoSync(url: String, attach: (String) -> Unit) {
         cancel()
+        forgetLibassCopies()
         val generationBefore = sidecar.currentGenerationFor(url)
         attach(url)
         val generationAfter = sidecar.currentGenerationFor(url)
@@ -165,7 +174,12 @@ internal class AutoSyncPlayerCoordinator(
         )
     }
 
+    fun forgetLibassCopies() {
+        AutoSyncLibassSubtitles.clear(player.getAssHandlerCompat())
+    }
+
     fun dispose() {
+        forgetLibassCopies()
         cancel()
         audioFallback.release()
         LocalPreviewSources.unregister(localPreviewSource)
@@ -377,6 +391,12 @@ internal class AutoSyncPlayerCoordinator(
         fallbackAttach: (String) -> Unit,
     ) {
         cancel()
+        forgetLibassCopies()
+        if (LiveTvPlaybackRegistry.isLiveTv(sourceUrl) ||
+            !(sourceUrl.startsWith("https://", true) || sourceUrl.startsWith("http://", true))) {
+            fallbackAttach(url)
+            return
+        }
 
         AutoSyncPreferencesRepository.ensureLoaded()
         when (
@@ -395,6 +415,12 @@ internal class AutoSyncPlayerCoordinator(
 
         val useLibass = getUseLibass()
         val subtitleHeaders = getSubtitleHeaders(url)
+        val assHandler = player.getAssHandlerCompat()
+        if (useLibass && assHandler != null && PlayerSubtitleUtils.mimeTypeFromUrl(url) == MimeTypes.TEXT_SSA) {
+            val language = candidates.firstOrNull { it.url == url }?.language?.takeIf { it.isNotBlank() } ?: getPreferredLanguage()
+            startLibass(libassOperationToken, url, candidateScope, subtitleHeaders, language, assHandler, fallbackAttach)
+            return
+        }
         if (!sidecar.canAttachAddonSubtitleViaSidecar(url, useLibass)) {
             fallbackAttach(url)
             showToast(AutoSyncBubbleKind.Failure) { getString(Res.string.autosync_toast_failed_unsupported) }
@@ -486,7 +512,9 @@ internal class AutoSyncPlayerCoordinator(
                     candidateScope == AutoSyncCandidateScope.STARTUP_SEARCH &&
                     (
                         analysisOutcome == null ||
-                            analysisOutcome == AutoSyncAnalysisOutcome.SUBTITLE_UNAVAILABLE
+                            analysisOutcome == AutoSyncAnalysisOutcome.SUBTITLE_UNAVAILABLE ||
+                            analysisOutcome == AutoSyncAnalysisOutcome.NO_FIT ||
+                            analysisOutcome == AutoSyncAnalysisOutcome.INCONCLUSIVE
                         )
                 ) {
                     secondaryLanguageSearchSeed(
@@ -687,6 +715,110 @@ internal class AutoSyncPlayerCoordinator(
         }
     }
 
+    private fun startLibass(
+        token: Long,
+        url: String,
+        candidateScope: AutoSyncCandidateScope,
+        subtitleHeaders: Map<String, String>,
+        subtitleLanguage: String?,
+        assHandler: AssHandler,
+        attach: (String) -> Unit,
+    ) {
+        attach(url)
+        EmbeddedSubtitleTimelineLoader.prefetch(scope, sourceUrl, sourceHeaders)
+        fun isAss(candidateUrl: String) =
+            PlayerSubtitleUtils.mimeTypeFromUrl(candidateUrl) == MimeTypes.TEXT_SSA
+
+        job = scope.launch {
+            try {
+                var outcome: AutoSyncAnalysisOutcome? = null
+                suspend fun search(ass: Boolean): AutoSyncResolvedTimeline? {
+                    val pool = { candidates.filter { isAss(it.url) == ass } }
+                    return AutomaticSubtitleSync.findTimelineRetime(
+                        sourceKey = sourceUrl,
+                        sourceHeaders = sourceHeaders,
+                        selectedSubtitleUrl = url,
+                        selectedSubtitleHeaders = subtitleHeaders,
+                        preferredLanguage = subtitleLanguage,
+                        alternativeSubtitles = candidateScope.alternativeCandidates(pool()),
+                        alternativeSubtitlesProvider = if (candidateScope.usesAlternativeProvider) pool else null,
+                        onAnalysisOutcome = { outcome = it },
+                    )
+                }
+                var resolved = search(ass = true)
+                // No ASS/SSA fits: try the other formats, unless the video has nothing to compare with.
+                if (
+                    resolved == null && candidateScope.usesAlternativeProvider &&
+                    token == libassOperationToken &&
+                    outcome != AutoSyncAnalysisOutcome.NO_SUBTITLE_TRACKS &&
+                    outcome != AutoSyncAnalysisOutcome.NO_USABLE_REFERENCE &&
+                    candidates.any { !isAss(it.url) }
+                ) {
+                    resolved = search(ass = false)
+                }
+                currentCoroutineContext().ensureActive()
+                if (token != libassOperationToken) return@launch
+                if (resolved == null) {
+                    showToast(AutoSyncBubbleKind.Failure) { buildAutoSyncFailureToast(outcome) }
+                    return@launch
+                }
+
+                val chosenUrl = resolved.subtitleUrl
+                if (!isAss(chosenUrl)) {
+                    // Nuvio's own switch shows the SRT/VTT through the sidecar; retime it there.
+                    attach(chosenUrl)
+                    if (!applyAutoSyncSidecarTimeline(sidecar, chosenUrl, resolved.timeline)) {
+                        if (token == libassOperationToken) {
+                            attach(url)
+                            showToast(AutoSyncBubbleKind.Failure) { getString(Res.string.autosync_toast_failed) }
+                        }
+                        return@launch
+                    }
+                    onMimeTypeSelected(PlayerSubtitleUtils.mimeTypeFromUrl(chosenUrl))
+                    onSubtitleDelayChanged(0)
+                    appliedListener?.invoke(chosenUrl, 0)
+                    AutoSyncSyncedSubtitle.mark(chosenUrl)
+                    showToast(AutoSyncBubbleKind.Success) { getString(Res.string.autosync_toast_synced_replaced) }
+                    return@launch
+                }
+                val tolerance = AutoSyncPreferencesRepository.syncToleranceMs.value
+                val withinTolerance = tolerance > 0 && chosenUrl == url &&
+                    resolved.timeline.maxAlignmentShiftMs() <= tolerance
+                if (!withinTolerance) {
+                    val body = resolved.subtitleBody ?: AutomaticSubtitleSync.downloadSubtitleBody(
+                        url = chosenUrl,
+                        headers = resolved.subtitleHeaders.ifEmpty { getSubtitleHeaders(chosenUrl) },
+                        languageHint = subtitleLanguage,
+                    )
+                    val retimed = withContext(autoSyncCpuDispatcher) {
+                        AutoSyncSubtitleTextRetimer.retime(body, resolved.timeline)
+                    } ?: run {
+                        showToast(AutoSyncBubbleKind.Failure) { getString(Res.string.autosync_toast_failed) }
+                        return@launch
+                    }
+                    currentCoroutineContext().ensureActive()
+                    if (token != libassOperationToken) return@launch
+                    val trackId = addonSubtitleTrackId(chosenUrl)
+                    if (chosenUrl == url) {
+                        AutoSyncLibassSubtitles.apply(assHandler, trackId, retimed)
+                    } else {
+                        // Nuvio's own switch loads the chosen subtitle; libass gets the synced copy.
+                        AutoSyncLibassSubtitles.remember(assHandler, trackId, retimed)
+                        attach(chosenUrl)
+                    }
+                }
+                onSubtitleDelayChanged(0)
+                appliedListener?.invoke(chosenUrl, 0)
+                AutoSyncSyncedSubtitle.mark(chosenUrl)
+                showToast(AutoSyncBubbleKind.Success) { getString(Res.string.autosync_toast_synced) }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (_: Exception) {
+                if (token == libassOperationToken) showToast(AutoSyncBubbleKind.Failure) { getString(Res.string.autosync_toast_failed) }
+            }
+        }
+    }
+
     private data class RetryContext(
         val subtitleUrl: String,
         val subtitleHeaders: Map<String, String>,
@@ -705,6 +837,8 @@ private suspend fun buildAutoSyncFailureToast(analysisOutcome: AutoSyncAnalysisO
             AutoSyncAnalysisOutcome.NO_SUBTITLE_TRACKS,
             AutoSyncAnalysisOutcome.NO_USABLE_REFERENCE,
             -> Res.string.autosync_toast_failed_no_reference
+            AutoSyncAnalysisOutcome.NO_FIT -> Res.string.autosync_toast_no_fit
+            AutoSyncAnalysisOutcome.INCONCLUSIVE,
             AutoSyncAnalysisOutcome.SUBTITLE_UNAVAILABLE,
             null,
             -> Res.string.autosync_toast_failed

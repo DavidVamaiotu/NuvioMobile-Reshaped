@@ -13,4 +13,5 @@
     <string name="autosync_toast_retry_none">Auto Sync • Nie znaleziono lepszej referencji</string>
     <string name="autosync_toast_retry_failed">Auto Sync • Ponowna próba z inną referencją nie powiodła się • zachowano bieżącą synchronizację</string>
     <string name="autosync_label_synced">Zsynchronizowano automatycznie</string>
+    <string name="autosync_toast_no_fit">Synchronizacja nie powiodła się: te napisy nie pasują do tej wersji wideo.</string>
 </resources>
