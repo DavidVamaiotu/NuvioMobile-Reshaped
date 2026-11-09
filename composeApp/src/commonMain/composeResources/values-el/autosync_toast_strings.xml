@@ -13,4 +13,5 @@
     <string name="autosync_toast_retry_none">Auto Sync • Δεν βρέθηκε καλύτερη αναφορά</string>
     <string name="autosync_toast_retry_failed">Auto Sync • Η νέα προσπάθεια με άλλη αναφορά απέτυχε • διατηρήθηκε ο τρέχων συγχρονισμός</string>
     <string name="autosync_label_synced">Αυτόματος συγχρονισμός</string>
+    <string name="autosync_toast_no_fit">Ο συγχρονισμός απέτυχε: αυτοί οι υπότιτλοι δεν ταιριάζουν με αυτήν την έκδοση του βίντεο.</string>
 </resources>

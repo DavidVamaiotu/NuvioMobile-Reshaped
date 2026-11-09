@@ -108,6 +108,27 @@ class ChapterSkipIntervalsTest {
     }
 
     @Test
+    fun postCreditsSceneChapterIsKeptAsSkipTargetNotSkipSegment() {
+        val chapters = chapters(0L to "Movie", 5_520_000L to "Credits", 5_700_000L to "Post-Credits Scene")
+        val intervals = ChapterSkipIntervals.fromChapters(chapters, 6_000_000L)
+        // The scene is exposed as a post-credits target (skipping the credits lands on it),
+        // never as a skippable segment itself.
+        assertTrue(intervals.filter { it.startTime == 5_700.0 }.all { it.type == "post-credits" })
+        assertTrue(intervals.any { it.type == "post-credits" && it.startTime == 5_700.0 })
+        // 180s of credits, within the 240s limit.
+        assertTrue(intervals.any { it.type == "outro" && it.startTime == 5_520.0 && it.endTime == 5_700.0 })
+    }
+
+    @Test
+    fun midCreditsSceneChapterIsKeptAsSkipTargetNotSkipSegment() {
+        val chapters = chapters(0L to "Movie", 5_400_000L to "Credits", 5_600_000L to "Mid-Credits Scene", 5_700_000L to "More Credits")
+        val intervals = ChapterSkipIntervals.fromChapters(chapters, 6_000_000L)
+        assertTrue(intervals.filter { it.startTime == 5_600.0 }.all { it.type == "post-credits" })
+        assertTrue(intervals.any { it.type == "post-credits" && it.startTime == 5_600.0 })
+        assertTrue(intervals.any { it.type == "outro" && it.startTime == 5_400.0 && it.endTime == 5_600.0 })
+    }
+
+    @Test
     fun sceneNamedChaptersDoNotFalseMatch() {
         val chapters = chapters(0L to "The Opening", 600_000L to "The Journey", 1_200_000L to "The Ending", 1_500_000L to "Alternate Ending")
         assertTrue(ChapterSkipIntervals.fromChapters(chapters, 1_800_000L).isEmpty())

@@ -13,4 +13,5 @@
     <string name="autosync_toast_retry_none">Auto Sync • Aucune meilleure référence trouvée</string>
     <string name="autosync_toast_retry_failed">Auto Sync • Échec du nouvel essai avec une autre référence • synchronisation actuelle conservée</string>
     <string name="autosync_label_synced">Synchronisé automatiquement</string>
+    <string name="autosync_toast_no_fit">Échec de la synchronisation&#160;: ces sous-titres ne correspondent pas à cette version de la vidéo.</string>
 </resources>

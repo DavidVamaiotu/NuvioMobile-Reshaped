@@ -13,4 +13,5 @@
     <string name="autosync_toast_retry_none">Auto Sync • Không tìm thấy tham chiếu tốt hơn</string>
     <string name="autosync_toast_retry_failed">Auto Sync • Thử lại với tham chiếu khác thất bại • giữ nguyên đồng bộ hiện tại</string>
     <string name="autosync_label_synced">Đã tự động đồng bộ</string>
+    <string name="autosync_toast_no_fit">Đồng bộ thất bại: Phụ đề không khớp với bản video này.</string>
 </resources>

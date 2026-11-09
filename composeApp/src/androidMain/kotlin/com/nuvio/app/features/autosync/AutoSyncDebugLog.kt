@@ -24,14 +24,14 @@ import java.util.UUID
  * This intentionally logs subtitle cue text in verbose mode for debugging alignment.
  * Request headers, auth tokens and complete subtitle/video URLs are not logged.
  */
-internal object AutoSyncDebugLog {
-    val ENABLED: Boolean
+internal actual object AutoSyncDebugLog {
+    actual val ENABLED: Boolean
         get() {
             AutoSyncPreferencesRepository.ensureLoaded()
             return AutoSyncPreferencesRepository.debugLogsEnabled.value
         }
 
-    val VERBOSE: Boolean
+    actual val VERBOSE: Boolean
         get() = ENABLED
 
     private const val TAG = "NuvioAutoSync"
@@ -49,7 +49,7 @@ internal object AutoSyncDebugLog {
     private var startedElapsedMs: Long = 0L
     private var active: Boolean = false
 
-    fun start(
+    actual fun start(
         sourceKey: String,
         subtitleUrl: String,
     ) {
@@ -72,23 +72,23 @@ internal object AutoSyncDebugLog {
         Log.i(TAG, "session=$sessionId started")
     }
 
-    fun section(title: () -> String) {
+    actual fun section(title: () -> String) {
         if (!ENABLED) return
         appendRaw("")
         appendRaw("=== ${title()} ===")
     }
 
-    fun info(message: () -> String) {
+    actual fun info(message: () -> String) {
         if (!ENABLED) return
         append("INFO", message())
     }
 
-    fun warn(message: () -> String) {
+    actual fun warn(message: () -> String) {
         if (!ENABLED) return
         append("WARN", message())
     }
 
-    fun error(throwable: Throwable? = null, message: () -> String) {
+    actual fun error(throwable: Throwable?, message: () -> String) {
         if (!ENABLED) return
         val text = message()
         val detail = if (throwable == null) {
@@ -99,11 +99,11 @@ internal object AutoSyncDebugLog {
         append("ERROR", detail)
     }
 
-    fun verbose(message: () -> String) {
+    actual fun verbose(message: () -> String) {
         if (VERBOSE) append("VERBOSE", message())
     }
 
-    fun cue(
+    actual fun cue(
         prefix: String,
         index: Int,
         startMs: Long,
@@ -121,11 +121,11 @@ internal object AutoSyncDebugLog {
      * Records a cue timeline for the report's replayable TIMING DUMP. Only references to the
      * already immutable cue lists are kept; encoding happens once, when the report is finished.
      */
-    fun timing(
+    actual fun timing(
         label: String,
         cues: List<SubtitleSyncCue>,
-        estimatedEndStartsMs: Set<Long> = emptySet(),
-        sdh: Boolean = false,
+        estimatedEndStartsMs: Set<Long>,
+        sdh: Boolean,
     ) {
         if (!ENABLED) return
         synchronized(lock) {
@@ -277,7 +277,7 @@ internal object AutoSyncDebugLog {
         }.getOrDefault("<source>")
     }
 
-    fun formatTimestamp(ms: Long): String {
+    actual fun formatTimestamp(ms: Long): String {
         val safe = ms.coerceAtLeast(0L)
         val hours = safe / 3_600_000L
         val minutes = (safe % 3_600_000L) / 60_000L

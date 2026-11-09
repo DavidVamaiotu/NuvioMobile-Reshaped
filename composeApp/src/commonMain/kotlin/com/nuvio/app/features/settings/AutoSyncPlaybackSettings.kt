@@ -64,7 +64,6 @@ internal fun AutoSyncPlaybackSettingsRows(
     val speechModel by SubtitleSyncStatus.speechModel.collectAsStateWithLifecycle()
     var offerSpeechModel by remember { mutableStateOf(false) }
 
-    if (isIos) return
 
     val preferredLanguageAvailable =
         preferredSubtitleLanguage.isNotBlank() &&
@@ -146,7 +145,7 @@ internal fun AutoSyncPlaybackSettingsRows(
         isTablet = isTablet,
         onCheckedChange = AutoSyncPreferencesRepository::setDebugLogsEnabled,
     )
-    AudioSyncFallbackSettingsRows(isTablet = isTablet, enabled = enabled && preferredSubtitleAutoSyncOnStart)
+    if (!isIos) AudioSyncFallbackSettingsRows(isTablet = isTablet, enabled = enabled && preferredSubtitleAutoSyncOnStart)
 }
 
 /** The audio sync fallback: it runs only after AutoSync, so it follows AutoSync's switch. */
