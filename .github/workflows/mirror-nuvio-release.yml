@@ -232,14 +232,39 @@ jobs:
           echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           echo "Official versionCode: $VERSION_CODE"
 
-      - name: Use exact Nuvio version code
+      - name: Choose increasing Android version code
         if: steps.version.outputs.already_exists == 'false'
         env:
-          VERSION_CODE: ${{ steps.upstream.outputs.version_code }}
+          GH_TOKEN: ${{ github.token }}
+          OFFICIAL_VERSION_CODE: ${{ steps.upstream.outputs.version_code }}
         run: |
+          set -euo pipefail
+          python3 .github/scripts/test_mobile_release_version.py
+
+          # Fork revisions can share an upstream code. Compare with the last published
+          # mobile APK so every release advances, including the next upstream version.
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | @json' > "$RUNNER_TEMP/reshaped-releases.jsonl"
+          PREVIOUS_TAG="$(python3 .github/scripts/mobile-release-version.py previous-release < "$RUNNER_TEMP/reshaped-releases.jsonl")"
+          PREVIOUS_CODE=0
+          PREVIOUS_APK=""
+          if [[ -n "$PREVIOUS_TAG" ]]; then
+            mkdir -p "$RUNNER_TEMP/reshaped-previous"
+            gh release download "$PREVIOUS_TAG" --repo "$GITHUB_REPOSITORY" \
+              --pattern 'NuvioRS-*-arm64.apk' --dir "$RUNNER_TEMP/reshaped-previous"
+            PREVIOUS_APK="$(find "$RUNNER_TEMP/reshaped-previous" -maxdepth 1 -name '*.apk' -type f -print -quit)"
+            SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+            AAPT="$(find "$SDK_ROOT/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+            test -n "$PREVIOUS_APK" && test -x "$AAPT"
+            PREVIOUS_CODE="$("$AAPT" dump badging "$PREVIOUS_APK" | python3 .github/scripts/mobile-release-version.py apk-code)"
+          fi
+          VERSION_CODE="$(python3 .github/scripts/mobile-release-version.py next-code "$OFFICIAL_VERSION_CODE" "$PREVIOUS_CODE")"
           sed -i -E \
             "s/^CURRENT_PROJECT_VERSION[[:space:]]*=.*/CURRENT_PROJECT_VERSION=$VERSION_CODE/" \
             iosApp/Configuration/Version.xcconfig
+          echo "RESHAPED_RELEASE_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "RESHAPED_PREVIOUS_APK=$PREVIOUS_APK" >> "$GITHUB_ENV"
+          echo "Android versionCode: $PREVIOUS_CODE -> $VERSION_CODE (upstream $OFFICIAL_VERSION_CODE)"
 
       - name: Set up Java
         if: steps.version.outputs.already_exists == 'false'
@@ -380,6 +405,22 @@ jobs:
             echo "Expected 4 Nuvio RS APKs, found $APK_COUNT"
             exit 1
           fi
+
+      - name: Verify APK update compatibility
+        if: steps.version.outputs.already_exists == 'false'
+        env:
+          AUTOSYNC_TAG: ${{ steps.version.outputs.autosync_tag }}
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          AAPT="$(find "$SDK_ROOT/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          ARGS=(--aapt "$AAPT" --apksigner "$APKSIGNER" \
+            --expected-code "$RESHAPED_RELEASE_VERSION_CODE" --expected-version "$AUTOSYNC_TAG")
+          if [[ -n "$RESHAPED_PREVIOUS_APK" ]]; then
+            ARGS+=(--previous-apk "$RESHAPED_PREVIOUS_APK")
+          fi
+          python3 .github/scripts/mobile-release-version.py verify "${ARGS[@]}" dist/*.apk
 
       - name: Push merged Nuvio release
         if: steps.version.outputs.already_exists == 'false'
