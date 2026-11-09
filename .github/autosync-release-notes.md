@@ -1,2 +1,3 @@
-- Updated to upstream Nuvio 0.6.6-beta, including reorganized settings, subtitle font/rendering controls, chapter and post-credits handling, and playback fixes.
-- Kept the Nuvio Reshaped settings page and search entries, AutoSync/AudioSync controls, Live TV, seek previews, network monitoring, and volume boost. Previously imported Reshaped subtitle fonts remain available to the new subtitle overlay.
+- Updated to upstream Nuvio 0.6.10-beta, including the shared Android/iOS AutoSync engine and playback and audio improvements.
+- Retained Reshaped settings and search, subtitle reference retries and debug reports, AudioSync fallback, Live TV, seek previews, custom fonts, network monitoring, and volume boost.
+- Adapted the MPV coordinator to shared code while preserving retry behavior, cache exclusions, and Live TV recovery alongside upstream playback recovery.
