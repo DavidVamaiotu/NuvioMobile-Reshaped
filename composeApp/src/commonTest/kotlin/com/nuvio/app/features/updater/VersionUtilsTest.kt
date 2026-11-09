@@ -6,6 +6,13 @@ import kotlin.test.Test
 
 class VersionUtilsTest {
     @Test
+    fun `Reshaped beta revision updates the original beta build`() {
+        assertTrue(VersionUtils.isRemoteNewer("0.6.10-beta-autosync.1", "0.6.10-beta-autosync"))
+        assertFalse(VersionUtils.isRemoteNewer("0.6.10-beta-autosync", "0.6.10-beta-autosync.1"))
+        assertTrue(VersionUtils.isRemoteNewer("0.6.11-beta-autosync", "0.6.10-beta-autosync.1"))
+    }
+
+    @Test
     fun `stable release is newer than its prerelease`() {
         assertTrue(VersionUtils.isRemoteNewer("1.1.0", "1.1.0-rc.2"))
     }

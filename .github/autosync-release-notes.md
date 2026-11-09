@@ -1,3 +1,4 @@
 - Updated to upstream Nuvio 0.6.10-beta, including the shared Android/iOS AutoSync engine and playback and audio improvements.
 - Retained Reshaped settings and search, subtitle reference retries and debug reports, AudioSync fallback, Live TV, seek previews, custom fonts, network monitoring, and volume boost.
 - Adapted the MPV coordinator to shared code while preserving retry behavior, cache exclusions, and Live TV recovery alongside upstream playback recovery.
+- Combined MPV amplification with Reshaped volume boost so either control retains the other's gain and both use the correct MPV volume scale.

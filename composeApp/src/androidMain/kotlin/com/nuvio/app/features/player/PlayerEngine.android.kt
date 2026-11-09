@@ -86,9 +86,8 @@ import com.nuvio.app.features.streams.PlaybackThroughputSampler
 import com.nuvio.app.features.streams.normalizeStreamType
 import `is`.xyz.mpv.BaseMPVView
 import com.nuvio.app.features.player.volumeboost.ExoVolumeBoostEffect
-import com.nuvio.app.features.player.volumeboost.LIBMPV_VOLUME_MAX
 import com.nuvio.app.features.player.volumeboost.VolumeBoost
-import com.nuvio.app.features.player.volumeboost.libmpvVolumeForBoost
+import com.nuvio.app.features.player.volumeboost.mpvVolumeForGains
 import `is`.xyz.mpv.MPV
 import `is`.xyz.mpv.MPVNode
 import `is`.xyz.mpv.Utils
@@ -1762,6 +1761,8 @@ private class NuvioLibmpvView(
     private val hardwareDecodingEnabled: Boolean,
     private val yuv420pEnabled: Boolean,
 ) : MpvSurfaceView(context, videoOutput.mpvValue) {
+    private var reshapedBoostDb = 0f
+    private var playerAmplificationDb = 0
     private var currentSourceUrl: String? = null
     private var currentSourceAudioUrl: String? = null
     private var currentRequestHeaders: Map<String, String> = emptyMap()
@@ -1815,7 +1816,6 @@ private class NuvioLibmpvView(
         mpv.setOptionString("volume-max", "$LIBMPV_MAX_VOLUME_PERCENT").logIfMpvError("volume-max")
         mpv.setOptionString("vd-lavc-film-grain", "cpu")
         mpv.setOptionString("sub-fonts-dir", SubtitleFontStore.fontsDir(context).path)
-        mpv.setOptionString("volume-max", LIBMPV_VOLUME_MAX) // Nuvio RS: volume boost
         mpv.setPropertyBoolean("keep-open", true)
         mpv.setPropertyBoolean("input-default-bindings", true)
         mpv.setPropertyBoolean("audio-fallback-to-null", true)
@@ -2211,7 +2211,8 @@ private class NuvioLibmpvView(
 
             override fun setAudioAmplificationDb(db: Int) {
                 executeMpv {
-                    mpv.setPropertyDouble("volume", 100.0 * audioAmplificationGain(db))
+                    playerAmplificationDb = db
+                    applyCombinedVolume()
                 }
             }
         }
@@ -2263,7 +2264,14 @@ private class NuvioLibmpvView(
     }
 
     fun applyVolumeBoostDb(gainDb: Float) { // Nuvio RS: volume boost
-        executeMpv { mpv.setPropertyDouble("volume", libmpvVolumeForBoost(gainDb)) }
+        executeMpv {
+            reshapedBoostDb = gainDb
+            applyCombinedVolume()
+        }
+    }
+
+    private fun applyCombinedVolume() {
+        mpv.setPropertyDouble("volume", mpvVolumeForGains(reshapedBoostDb, playerAmplificationDb))
     }
 
     private fun applyRequestHeadersNow(headers: Map<String, String>) {
