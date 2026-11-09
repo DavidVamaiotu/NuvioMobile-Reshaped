@@ -45,7 +45,12 @@ class Apk:
 def inspect(apk, aapt, apksigner):
     code, version = package_info(subprocess.check_output([aapt, "dump", "badging", apk], text=True))
     signing = subprocess.check_output([apksigner, "verify", "--print-certs", apk], text=True)
-    signers = frozenset(re.findall(r"Signer #[0-9]+ certificate SHA-256 digest: ([0-9a-fA-F]{64})", signing))
+    # Build Tools 37 labels signing schemes ("V2 Signer:"); older versions
+    # label signer indexes ("Signer #1"). Source-stamp identities are separate.
+    signers = frozenset(value.lower() for value in re.findall(
+        r"^(?:Signer #[0-9]+|V[0-9.]+ Signer(?: #[0-9]+)?):? certificate SHA-256 digest: ([0-9a-fA-F]{64})$",
+        signing, re.M,
+    ))
     if not signers:
         raise ValueError("No verified APK signing identity")
     return Apk(code, version, signers)

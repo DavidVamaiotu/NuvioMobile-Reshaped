@@ -2,6 +2,7 @@ import importlib.util
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.dont_write_bytecode = True
 
@@ -48,6 +49,17 @@ class MobileReleaseVersionTest(unittest.TestCase):
         for current in [release.Apk(153, "new", previous.signers), release.Apk(154, "new", frozenset({"other"}))]:
             with self.subTest(current=current), self.assertRaises(ValueError):
                 release.verify([current], previous, current.code, "new")
+
+    def test_signer_output_from_old_and_new_build_tools(self):
+        digest = "a" * 64
+        badging = "package: name='com.nuvioreshaped.app' versionCode='154' versionName='new'"
+        for label in ["Signer #1", "V2 Signer:", "V3.1 Signer:"]:
+            output = f"{label} certificate SHA-256 digest: {digest}\nSource Stamp Signer certificate SHA-256 digest: {'b' * 64}\n"
+            with self.subTest(label=label), patch.object(release.subprocess, "check_output", side_effect=[badging, output]):
+                self.assertEqual(frozenset({digest}), release.inspect("apk", "aapt", "apksigner").signers)
+        with patch.object(release.subprocess, "check_output", side_effect=[badging, "Source Stamp Signer certificate SHA-256 digest: " + digest]):
+            with self.assertRaises(ValueError):
+                release.inspect("apk", "aapt", "apksigner")
 
     def test_all_architectures_must_match_the_release(self):
         previous = release.Apk(153, "old", frozenset({"key"}))
