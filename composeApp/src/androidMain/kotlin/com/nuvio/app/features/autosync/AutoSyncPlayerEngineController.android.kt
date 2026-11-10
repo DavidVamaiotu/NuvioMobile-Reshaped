@@ -105,6 +105,13 @@ internal class AutoSyncPlayerEngineController(
             fallbackAttach = ::setSubtitleUri,
         )
 
+    override fun setSubtitleUriWithRestoredAutoSync(url: String) =
+        coordinator.start(
+            url = url,
+            candidateScope = AutoSyncCandidateScope.SELECTED_THEN_SEARCH,
+            fallbackAttach = base::setSubtitleUri,
+        )
+
     override fun selectSubtitleTrack(index: Int) {
         coordinator.cancel()
         coordinator.forgetLibassCopies()

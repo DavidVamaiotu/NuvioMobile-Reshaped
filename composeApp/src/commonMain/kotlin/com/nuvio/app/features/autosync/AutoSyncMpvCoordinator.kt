@@ -164,14 +164,14 @@ internal class AutoSyncMpvCoordinator(
                 showMessage(token, AutoSyncBubbleKind.Working, Res.string.autosync_toast_analyzing)
                 var outcome: AutoSyncAnalysisOutcome? = null
                 var searchOutcome: AutoSyncReferenceSearchOutcome? = null
-                val resolved = AutomaticSubtitleSync.findTimelineRetime(
+                suspend fun search(searchScope: AutoSyncCandidateScope) = AutomaticSubtitleSync.findTimelineRetime(
                     sourceKey = sourceUrl,
                     sourceHeaders = sourceHeaders,
                     selectedSubtitleUrl = url,
                     selectedSubtitleHeaders = subtitleHeaders,
                     preferredLanguage = subtitleLanguage,
-                    alternativeSubtitles = candidateScope.alternativeCandidates(candidates),
-                    alternativeSubtitlesProvider = if (candidateScope.usesAlternativeProvider) {
+                    alternativeSubtitles = searchScope.alternativeCandidates(candidates),
+                    alternativeSubtitlesProvider = if (searchScope.usesAlternativeProvider) {
                         { candidates }
                     } else null,
                     onAnalysisOutcome = { outcome = it },
@@ -181,6 +181,13 @@ internal class AutoSyncMpvCoordinator(
                     onReferenceSearchOutcome = { searchOutcome = it },
                     allowLiveReference = false,
                 )
+                var resolved = search(candidateScope)
+                currentCoroutineContext().ensureActive()
+                if (retry == null && resolved == null && token == operationToken &&
+                    candidateScope.searchAfterSelectedFailed(outcome)
+                ) {
+                    resolved = search(AutoSyncCandidateScope.STARTUP_SEARCH)
+                }
                 currentCoroutineContext().ensureActive()
                 if (token != operationToken) return@launch
                 if (resolved == null) {
@@ -308,6 +315,9 @@ internal open class AutoSyncMpvEngineController(
 
     override fun setSubtitleUriWithSelectedAutoSync(url: String) =
         coordinator.start(url, AutoSyncCandidateScope.SELECTED_ONLY, base, replaceExternalSubtitle)
+
+    override fun setSubtitleUriWithRestoredAutoSync(url: String) =
+        coordinator.start(url, AutoSyncCandidateScope.SELECTED_THEN_SEARCH, base, replaceExternalSubtitle)
 
     override fun selectSubtitleTrack(index: Int) {
         coordinator.cancel()

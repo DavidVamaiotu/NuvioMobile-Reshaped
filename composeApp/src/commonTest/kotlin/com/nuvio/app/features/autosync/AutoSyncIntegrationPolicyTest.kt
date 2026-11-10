@@ -95,4 +95,17 @@ class AutoSyncIntegrationPolicyTest {
             ),
         )
     }
+    @Test
+    fun restoredSelectionSearchesAlternativesOnlyWhenAReferenceCanExist() {
+        val scope = AutoSyncCandidateScope.SELECTED_THEN_SEARCH
+        assertFalse(scope.usesAlternativeProvider)
+        assertTrue(scope.alternativeCandidates(emptyList()).isEmpty())
+        assertTrue(scope.searchAfterSelectedFailed(AutoSyncAnalysisOutcome.NO_FIT))
+        assertTrue(scope.searchAfterSelectedFailed(AutoSyncAnalysisOutcome.INCONCLUSIVE))
+        assertTrue(scope.searchAfterSelectedFailed(AutoSyncAnalysisOutcome.SUBTITLE_UNAVAILABLE))
+        assertFalse(scope.searchAfterSelectedFailed(AutoSyncAnalysisOutcome.NO_SUBTITLE_TRACKS))
+        assertFalse(scope.searchAfterSelectedFailed(AutoSyncAnalysisOutcome.NO_USABLE_REFERENCE))
+        assertFalse(AutoSyncCandidateScope.SELECTED_ONLY.searchAfterSelectedFailed(AutoSyncAnalysisOutcome.NO_FIT))
+    }
+
 }

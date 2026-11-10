@@ -27,6 +27,15 @@ internal fun PlayerEngineController.setSubtitleUriWithSelectedAutoSync(url: Stri
     }
 }
 
+internal fun PlayerEngineController.setSubtitleUriWithRestoredAutoSync(url: String) {
+    val autoSync = this as? AutoSyncPlayerController
+    if (autoSync != null) {
+        autoSync.setSubtitleUriWithRestoredAutoSync(url)
+    } else {
+        setSubtitleUri(url)
+    }
+}
+
 internal fun PlayerEngineController.setAutoSyncAppliedListener(
     listener: ((subtitleUrl: String, delayMs: Int) -> Unit)?,
 ) {

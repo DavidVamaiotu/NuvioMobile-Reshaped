@@ -1,3 +1,6 @@
+- Synced current upstream mobile fixes for session refresh, focused backdrops, subtitle restoration, MPV error details, and MDBList caching.
+- Adapted restored-subtitle search across ExoPlayer, libass and MPV while retaining Reshaped reference retries, secondary-language search, audio fallback and debug controls.
+- Preserved Reshaped defaults and settings placement; AutoSync can now be enabled without choosing a preferred subtitle language.
 - Updated to upstream Nuvio 0.6.10-beta, including the shared Android/iOS AutoSync engine and playback and audio improvements.
 - Retained Reshaped settings and search, subtitle reference retries and debug reports, AudioSync fallback, Live TV, seek previews, custom fonts, network monitoring, and volume boost.
 - Adapted the MPV coordinator to shared code while preserving retry behavior, cache exclusions, and Live TV recovery alongside upstream playback recovery.

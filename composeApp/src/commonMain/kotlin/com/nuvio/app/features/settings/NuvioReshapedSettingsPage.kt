@@ -116,7 +116,6 @@ internal fun LazyListScope.nuvioReshapedSettingsContent(isTablet: Boolean) {
                     AutoSyncPlaybackSettingsRows(
                         isTablet = isTablet,
                         enabled = !playerSettings.externalPlayerEnabled,
-                        preferredSubtitleLanguage = playerSettings.preferredSubtitleLanguage,
                     )
                     AutoSyncBubbleToastSettingsRow(isTablet = isTablet, enabled = !playerSettings.externalPlayerEnabled)
                 }
