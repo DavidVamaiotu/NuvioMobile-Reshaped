@@ -1,3 +1,4 @@
+- Added current upstream chapter controls, HLS/DASH compatibility fixes, clearer playback errors, and refresh of expired cached links while retaining Reshaped subtitle retries, fonts, seek previews, and cache behavior.
 - Synced current upstream mobile fixes for session refresh, focused backdrops, subtitle restoration, MPV error details, and MDBList caching.
 - Adapted restored-subtitle search across ExoPlayer, libass and MPV while retaining Reshaped reference retries, secondary-language search, audio fallback and debug controls.
 - Preserved Reshaped defaults and settings placement; AutoSync can now be enabled without choosing a preferred subtitle language.

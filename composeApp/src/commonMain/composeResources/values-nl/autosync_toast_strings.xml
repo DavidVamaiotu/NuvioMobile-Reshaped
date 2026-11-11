@@ -13,4 +13,5 @@
     <string name="autosync_toast_retry_none">Auto Sync • Geen betere referentie gevonden</string>
     <string name="autosync_toast_retry_failed">Auto Sync • Opnieuw proberen met andere referentie mislukt • huidige synchronisatie behouden</string>
     <string name="autosync_label_synced">Automatisch gesynchroniseerd</string>
+    <string name="autosync_toast_no_fit">Synchronisatie mislukt: deze ondertitels komen niet overeen met deze versie van de video.</string>
 </resources>
