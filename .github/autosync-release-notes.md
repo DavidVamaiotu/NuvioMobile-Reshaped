@@ -1,3 +1,4 @@
+- Added Continue Watching selection preferences and show-level Next Up dismissal migration while preserving Reshaped navigation, settings and playback controls; updated French and Slovak translations.
 - Added upstream next-matching-source fallback and shared source searches while retaining Reshaped connection-fit sorting, badges, filtering and playback recovery.
 - Stale fallback attempts cannot replace a manually selected source or stop the new source search.
 - Added current upstream chapter controls, HLS/DASH compatibility fixes, clearer playback errors, and refresh of expired cached links while retaining Reshaped subtitle retries, fonts, seek previews, and cache behavior.
