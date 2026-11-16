@@ -6,6 +6,17 @@ import kotlin.test.assertEquals
 class LibraryDisplaySettingsTest {
 
     @Test
+    fun legacyCalendarPreferenceSurvivesNewLibrarySelectionFields() {
+        val state = decodeLibraryDisplaySettings("""{"calendar_enabled":true,"layout_mode":"VERTICAL","sort_option":"TITLE_ASC"}""")
+        assertEquals(true, state.calendarEnabled)
+        assertEquals(LibraryLayoutMode.VERTICAL, state.layoutMode)
+        assertEquals(LibrarySortOption.TITLE_ASC, state.sortOption)
+        assertEquals(null, state.selectedSectionKey)
+        assertEquals(null, state.selectedType)
+        assertEquals(state, decodeLibraryDisplaySettings(encodeLibraryDisplaySettings(state)))
+    }
+
+    @Test
     fun `local default resolves to recently added while remote trackers preserve provider order`() {
         assertEquals(
             LibrarySortOption.ADDED_DESC,
@@ -202,11 +213,84 @@ class LibraryDisplaySettingsTest {
     }
 
     @Test
+    fun `vertical projection keeps only watched or unwatched items for the watched filter`() {
+        val section = LibrarySection(
+            type = "local",
+            displayTitle = "Library",
+            items = listOf(
+                item("seen", name = "Seen"),
+                item("unseen", name = "Unseen"),
+                item("show", type = "series", name = "Show"),
+            ),
+        )
+        val watchedIds = setOf("seen", "show")
+        fun projectionFor(filter: LibraryWatchedFilter) = buildLibraryVerticalProjection(
+            sections = listOf(section),
+            sourceMode = LibrarySourceMode.LOCAL,
+            selectedSectionKey = null,
+            selectedType = null,
+            sortOption = LibrarySortOption.TITLE_ASC,
+            watchedFilter = filter,
+            isWatched = { it.id in watchedIds },
+        ).entries.map { it.item.id }
+
+        assertEquals(listOf("seen", "show", "unseen"), projectionFor(LibraryWatchedFilter.ALL))
+        assertEquals(listOf("seen", "show"), projectionFor(LibraryWatchedFilter.WATCHED))
+        assertEquals(listOf("unseen"), projectionFor(LibraryWatchedFilter.UNWATCHED))
+    }
+
+    @Test
+    fun `vertical projection filters by genre and year with faceted counts`() {
+        val section = LibrarySection(
+            type = "local",
+            displayTitle = "Library",
+            items = listOf(
+                item("a", name = "A", releaseInfo = "2020").copy(genres = listOf("Drama", "Comedy")),
+                item("b", name = "B", releaseInfo = "2020").copy(genres = listOf("Drama")),
+                item("c", name = "C", releaseInfo = "2018-2021").copy(genres = listOf("Comedy")),
+                item("d", name = "D"),
+            ),
+        )
+        fun projectionFor(genre: String?, year: String?) = buildLibraryVerticalProjection(
+            sections = listOf(section),
+            sourceMode = LibrarySourceMode.LOCAL,
+            selectedSectionKey = null,
+            selectedType = null,
+            sortOption = LibrarySortOption.TITLE_ASC,
+            selectedGenre = genre,
+            selectedYear = year,
+        )
+
+        val all = projectionFor(genre = null, year = null)
+        assertEquals(listOf("Comedy" to 2, "Drama" to 2), all.availableGenres.map { it.key to it.count })
+        assertEquals(listOf("2020" to 2, "2018" to 1), all.availableYears.map { it.key to it.count })
+
+        val comedy = projectionFor(genre = "comedy", year = null)
+        assertEquals(listOf("a", "c"), comedy.entries.map { it.item.id })
+        assertEquals(listOf("2020" to 1, "2018" to 1), comedy.availableYears.map { it.key to it.count })
+
+        assertEquals(4, all.allTypesCount)
+        assertEquals(mapOf("movie" to 2), comedy.typeCounts)
+        assertEquals(2, comedy.allTypesCount)
+
+        val drama2020 = projectionFor(genre = "Drama", year = "2020")
+        assertEquals(listOf("a", "b"), drama2020.entries.map { it.item.id })
+        assertEquals(listOf("Comedy" to 1, "Drama" to 2), drama2020.availableGenres.map { it.key to it.count })
+
+        val missing = projectionFor(genre = "Horror", year = "1999")
+        assertEquals(null, missing.selectedGenre)
+        assertEquals(null, missing.selectedYear)
+        assertEquals(listOf("a", "b", "c", "d"), missing.entries.map { it.item.id })
+    }
+
+    @Test
     fun `display settings payload round trips and invalid values fall back safely`() {
         val state = LibraryDisplaySettingsUiState(
             layoutMode = LibraryLayoutMode.VERTICAL,
             sortOption = LibrarySortOption.TITLE_DESC,
             calendarEnabled = true,
+            selectedSectionKey = "personal:1",
+            selectedType = "series",
         )
 
         assertEquals(state, decodeLibraryDisplaySettings(encodeLibraryDisplaySettings(state)))
