@@ -1389,7 +1389,7 @@ private fun ExoPlayerSurface(
                 }
             },
         )
-        StyledSubtitleOverlay(subtitlePresenter.text, currentSubtitleStyle)
+        StyledSubtitleOverlay(subtitlePresenter.cues, currentSubtitleStyle)
     }
 }
 
@@ -1778,7 +1778,7 @@ private fun LibmpvPlayerSurface(
                 view.releaseMpv()
             },
         )
-        playerViewRef?.let { view -> StyledSubtitleOverlay(view.subtitleText, view.subtitleStyle) }
+        playerViewRef?.let { view -> StyledSubtitleOverlay(view.subtitleCues, view.subtitleStyle) }
     }
 }
 
@@ -1811,7 +1811,7 @@ private class NuvioLibmpvView(
     @Volatile
     private var latestSubtitleTracks: List<LibmpvTrack> = emptyList()
 
-    var subtitleText by mutableStateOf("")
+    var subtitleCues by mutableStateOf(StyledSubtitleCues())
         private set
     var subtitleStyle by mutableStateOf(SubtitleStyleState.DEFAULT)
         private set
@@ -1827,11 +1827,16 @@ private class NuvioLibmpvView(
                 mpv.setPropertyBoolean("sub-visibility", !styled)
                 styledSubtitleVisible = styled
             }
-            val text = if (styled) mpv.getPropertyString("sub-text").orEmpty() else ""
+            val text = if (styled) {
+                mpv.getPropertyString("sub-text/ass") ?: mpv.getPropertyString("sub-text").orEmpty()
+            } else {
+                ""
+            }
+            val cues = parseMpvSubtitleText(text)
             val style = appliedSubtitleStyle
             post {
                 if (!released.get()) {
-                    subtitleText = text
+                    subtitleCues = cues
                     subtitleStyle = style
                 }
             }

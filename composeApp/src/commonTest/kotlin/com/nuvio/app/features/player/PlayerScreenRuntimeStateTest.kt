@@ -15,6 +15,22 @@ import kotlin.test.assertTrue
 class PlayerScreenRuntimeStateTest {
 
     @Test
+    fun reshapedLiveTvDoesNotStartAddonTrackingEvenWhenDurationIsReported() {
+        val runtime = PlayerScreenRuntime(testPlayerScreenArgs().copy(
+            contentType = "live-tv",
+            providerAddonId = "reshaped-live-tv",
+        ))
+        runtime.updatePlaybackSnapshot(PlayerPlaybackSnapshot(
+            isLoading = false, isPlaying = true, positionMs = 60_000L, durationMs = 1_800_000L,
+        ))
+
+        runtime.emitAddonPlayerEvent(com.nuvio.app.features.addons.AddonPlayerAction.START)
+
+        assertNull(runtime.activeAddonPlayerEventTarget)
+        assertNull(runtime.lastAddonPlayerAction)
+    }
+
+    @Test
     fun controlsStartHidden() {
         assertFalse(PlayerScreenRuntime(testPlayerScreenArgs()).controlsVisible)
     }
