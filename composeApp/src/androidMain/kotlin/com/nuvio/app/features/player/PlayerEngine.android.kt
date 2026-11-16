@@ -90,7 +90,6 @@ import com.nuvio.app.features.player.volumeboost.VolumeBoost
 import com.nuvio.app.features.player.volumeboost.mpvVolumeForGains
 import `is`.xyz.mpv.MPV
 import `is`.xyz.mpv.MPVNode
-import `is`.xyz.mpv.Utils
 import com.nuvio.tv.libass.media.widget.AssSubtitleSurfaceView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -1760,7 +1759,7 @@ private fun LibmpvPlayerSurface(
                     layoutParams = android.view.ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
                     keepScreenOn = false
                     runCatching {
-                        Utils.copyAssets(viewContext)
+                        prepareMpvAssets(viewContext.filesDir, viewContext.cacheDir, { viewContext.assets.open(it) }, { Log.w("MpvAssets", "Failed to prepare mpv assets", it) })
                         initialize(viewContext.filesDir.path, viewContext.cacheDir.path)
                     }.onFailure { error ->
                         Log.e(TAG, "Failed to initialize libmpv", error)

@@ -18,6 +18,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -41,6 +42,9 @@ internal abstract class MpvSurfaceView(context: Context, private val vo: String)
         mpv.setCacheDir(cacheDir)
         mpv.setOptionString("vo", vo)
         initOptions()
+        // MPV 0.2 initializes in its constructor, before this directory is set.
+        // Retain existing user files and their precedence over normal options.
+        restoreLegacyMpvConfiguration(configDir) { command, path -> mpv.command(command, path) }
         mpv.setOptionString("force-window", "no")
         mpv.setOptionString("idle", "once")
         observeProperties()
@@ -164,4 +168,9 @@ internal abstract class MpvSurfaceView(context: Context, private val vo: String)
     private fun logFailure(error: Throwable) {
         Log.w("MpvSurfaceView", "libmpv operation failed", error)
     }
+}
+
+internal fun restoreLegacyMpvConfiguration(configDir: String, command: (String, String) -> Unit) {
+    File(configDir, "mpv.conf").takeIf { it.isFile }?.let { command("load-config-file", it.path) }
+    File(configDir, "input.conf").takeIf { it.isFile }?.let { command("load-input-conf", it.path) }
 }
