@@ -129,7 +129,7 @@ internal suspend fun loadAddonSubtitles(
     }.awaitAll().flatten()
 }
 
-private suspend fun parseAddonSubtitles(response: String, request: SubtitleAddonRequest): List<AddonSubtitle> {
+internal suspend fun parseAddonSubtitles(response: String, request: SubtitleAddonRequest): List<AddonSubtitle> {
     val subtitles = Json.parseToJsonElement(response).jsonObject["subtitles"]?.jsonArray.orEmpty()
     return subtitles.mapIndexedNotNull { index, element ->
         val obj = element as? JsonObject ?: return@mapIndexedNotNull null
@@ -148,6 +148,7 @@ private suspend fun parseAddonSubtitles(response: String, request: SubtitleAddon
             ),
             addonName = request.addonName,
             label = addonProvidedId?.takeIf { it != language && it != url },
+            title = obj.stringValue("label"),
         )
     }
 }
