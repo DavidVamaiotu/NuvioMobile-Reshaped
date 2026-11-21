@@ -54,8 +54,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           UPSTREAM_TAG="$(
-            gh api repos/NuvioMedia/NuvioMobile/releases \
-              --jq '[.[] | select(.draft == false)][0].tag_name'
+            gh api --paginate 'repos/NuvioMedia/NuvioMobile/releases?per_page=100' \
+              | jq -s '.' | python3 .github/scripts/select-mobile-upstream-release.py
           )"
 
           if [[ -z "$UPSTREAM_TAG" || "$UPSTREAM_TAG" == "null" ]]; then
@@ -240,6 +240,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 .github/scripts/test_mobile_release_version.py
+          python3 .github/scripts/test-select-mobile-upstream-release.py
 
           # Fork revisions can share an upstream code. Compare with the last published
           # mobile APK so every release advances, including the next upstream version.
