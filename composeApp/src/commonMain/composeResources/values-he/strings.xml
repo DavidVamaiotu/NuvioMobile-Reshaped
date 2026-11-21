@@ -1,3 +1,8 @@
+<!--
+Hebrew: Android looks for values-iw (it reports Hebrew with the legacy language code "iw"),
+while iOS and desktop look for values-he.
+Therefore, duplicate the values-he directory as values-iw. Keep both directories in the project.
+-->
 <resources>
     <string name="theme_gold">זהב</string>
     <string name="theme_jade">ירקן</string>
@@ -1781,7 +1786,7 @@
     <string name="addon_already_installed">התוסף הזה כבר מותקן.</string>
     <string name="addon_invalid_url">יש להזין כתובת תוסף תקינה</string>
     <string name="addon_load_manifest_failed">לא ניתן לטעון את ה-manifest</string>
-    <string name="app_brand_name">Nuvio</string>
+    <string name="app_brand_name">Nuvio RS</string>
     <string name="auth_account_deletion_failed">מחיקת החשבון נכשלה</string>
     <string name="auth_sign_in_failed">ההתחברות נכשלה</string>
     <string name="auth_sign_out_failed">ההתנתקות נכשלה</string>

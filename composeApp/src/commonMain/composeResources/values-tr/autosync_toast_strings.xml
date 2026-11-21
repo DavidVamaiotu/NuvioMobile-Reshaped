@@ -13,4 +13,5 @@
     <string name="autosync_toast_retry_none">Auto Sync • Daha iyi referans bulunamadı</string>
     <string name="autosync_toast_retry_failed">Auto Sync • Başka referansla yeniden deneme başarısız • mevcut senkronizasyon korundu</string>
     <string name="autosync_label_synced">Otomatik eşitlendi</string>
+    <string name="autosync_toast_no_fit">Senkronizasyon başarısız: Bu altyazılar videonun bu sürümüyle eşleşmiyor.</string>
 </resources>

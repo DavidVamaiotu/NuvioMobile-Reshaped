@@ -12,5 +12,6 @@
     <string name="autosync_toast_retry_synced">Auto Sync • Szinkronizálva egy másik referenciához</string>
     <string name="autosync_toast_retry_none">Auto Sync • Nem található jobb referencia</string>
     <string name="autosync_toast_retry_failed">Auto Sync • Az újrapróbálkozás másik referenciával sikertelen • jelenlegi szinkron megtartva</string>
+    <string name="autosync_toast_no_fit">Sikertelen szinkronizálás: ez a felirat nem illik a videó ezen verziójához.</string>
     <string name="autosync_label_synced">Automatikusan szinkronizálva</string>
 </resources>
