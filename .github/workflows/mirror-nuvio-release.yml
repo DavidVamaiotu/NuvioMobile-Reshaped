@@ -89,6 +89,16 @@ jobs:
             PREVIOUS_TAG="$BASE_TAG"
           fi
 
+          # Mirroring reuses an existing numbered release too; a missing bare
+          # tag does not mean that this upstream version has not been shipped.
+          DEFAULT_SUFFIX="autosync"
+          if (( MAX_REVISION > 0 )); then
+            DEFAULT_SUFFIX="autosync.${MAX_REVISION}"
+          elif [[ "$BASE_EXISTS" != "true" && "$UPSTREAM_TAG" =~ -[^+]*\.[0-9]+(\+[^[:space:]]+)?$ ]]; then
+            # Numbered numeric-beta tags remain visible to older fork updaters.
+            DEFAULT_SUFFIX="autosync.1"
+          fi
+
           # A workflow-file push is an explicit fork release trigger. Pick the
           # next revision for the current upstream tag so the new fork code is
           # actually published without changing scheduled mirror behavior.
@@ -96,10 +106,10 @@ jobs:
             if [[ "$BASE_EXISTS" == "true" || "$MAX_REVISION" -gt 0 ]]; then
               RELEASE_SUFFIX="autosync.$(( MAX_REVISION + 1 ))"
             else
-              RELEASE_SUFFIX="autosync"
+              RELEASE_SUFFIX="$DEFAULT_SUFFIX"
             fi
-          elif [[ -z "$RELEASE_SUFFIX" ]]; then
-            RELEASE_SUFFIX="autosync"
+          elif [[ -z "$RELEASE_SUFFIX" || "$RELEASE_SUFFIX" == "autosync" ]]; then
+            RELEASE_SUFFIX="$DEFAULT_SUFFIX"
           fi
 
           AUTOSYNC_TAG="${UPSTREAM_TAG}-${RELEASE_SUFFIX}"
@@ -241,6 +251,7 @@ jobs:
           set -euo pipefail
           python3 .github/scripts/test_mobile_release_version.py
           python3 .github/scripts/test-select-mobile-upstream-release.py
+          python3 .github/scripts/test_autosync_mirror_selection.py
 
           # Fork revisions can share an upstream code. Compare with the last published
           # mobile APK so every release advances, including the next upstream version.
