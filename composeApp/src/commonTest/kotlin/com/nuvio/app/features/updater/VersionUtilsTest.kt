@@ -6,6 +6,32 @@ import kotlin.test.Test
 
 class VersionUtilsTest {
     @Test
+    fun `next upstream beta supersedes numbered fork builds`() {
+        assertTrue(VersionUtils.isRemoteNewer("1.1.0-beta.3-autosync", "1.1.0-beta.2-autosync.6"))
+        assertTrue(VersionUtils.isRemoteNewer("1.1.0-beta.10-autosync.1", "1.1.0-beta.2-autosync.999"))
+        assertFalse(VersionUtils.isRemoteNewer("1.1.0-beta.2-autosync.999", "1.1.0-beta.3-autosync"))
+    }
+
+    @Test
+    fun `fork revisions compare numerically after upstream versions`() {
+        assertTrue(VersionUtils.isRemoteNewer("1.1.0-beta.2-autosync.10", "1.1.0-beta.2-autosync.9"))
+        assertTrue(VersionUtils.isRemoteNewer("1.1.0-autosync.10", "1.1.0-autosync.9"))
+        assertFalse(VersionUtils.isRemoteNewer("1.1.0-autosync.9", "1.1.0-autosync.10"))
+    }
+
+    @Test
+    fun `stable release supersedes every revision of its prereleases`() {
+        assertTrue(VersionUtils.isRemoteNewer("1.1.0-autosync", "1.1.0-rc.99-autosync.999"))
+        assertFalse(VersionUtils.isRemoteNewer("1.1.0-beta.99-autosync.999", "1.1.0-autosync.1"))
+    }
+
+    @Test
+    fun `numbered fork revisions preserve stable and beta channels`() {
+        assertFalse(VersionUtils.isPrerelease("1.1.0-autosync.6"))
+        assertTrue(VersionUtils.isPrerelease("1.1.0-beta.2-autosync.6"))
+    }
+
+    @Test
     fun `Reshaped beta revision updates the original beta build`() {
         assertTrue(VersionUtils.isRemoteNewer("0.6.10-beta-autosync.1", "0.6.10-beta-autosync"))
         assertFalse(VersionUtils.isRemoteNewer("0.6.10-beta-autosync", "0.6.10-beta-autosync.1"))

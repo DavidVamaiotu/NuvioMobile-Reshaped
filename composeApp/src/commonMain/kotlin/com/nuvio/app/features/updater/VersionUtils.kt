@@ -4,9 +4,15 @@ internal data class SemanticVersion(
     val major: Long,
     val minor: Long,
     val patch: Long,
-    val prerelease: List<String>
+    val prerelease: List<String>,
+    val forkRevision: String = "0"
 ) : Comparable<SemanticVersion> {
     override fun compareTo(other: SemanticVersion): Int {
+        compareUpstream(other).takeIf { it != 0 }?.let { return it }
+        return comparePrereleaseIdentifier(forkRevision, other.forkRevision)
+    }
+
+    private fun compareUpstream(other: SemanticVersion): Int {
         compareValues(major, other.major).takeIf { it != 0 }?.let { return it }
         compareValues(minor, other.minor).takeIf { it != 0 }?.let { return it }
         compareValues(patch, other.patch).takeIf { it != 0 }?.let { return it }
@@ -55,8 +61,15 @@ internal object VersionUtils {
         return raw.trim().removePrefix("v").removePrefix("V").replace(Regex("-autosync$", RegexOption.IGNORE_CASE), "")
     }
 
+    private val forkSuffixPattern = Regex("-autosync(?:\\.([0-9]+))?$", RegexOption.IGNORE_CASE)
+
     fun parse(raw: String?): SemanticVersion? {
-        val match = versionPattern.matchEntire(normalize(raw)) ?: return null
+        val normalized = normalize(raw)
+        val forkSuffix = forkSuffixPattern.find(normalized)
+        val upstream = forkSuffix?.let { normalized.removeRange(it.range) } ?: normalized
+        val revision = forkSuffix?.groupValues?.get(1)
+            ?.trimStart('0')?.ifEmpty { "0" } ?: "0"
+        val match = versionPattern.matchEntire(upstream) ?: return null
         return SemanticVersion(
             major = match.groupValues[1].toLongOrNull() ?: return null,
             minor = match.groupValues[2].toLongOrNull() ?: return null,
@@ -64,7 +77,8 @@ internal object VersionUtils {
             prerelease = match.groupValues[4]
                 .takeIf(String::isNotEmpty)
                 ?.split('.')
-                .orEmpty()
+                .orEmpty(),
+            forkRevision = revision
         )
     }
 
